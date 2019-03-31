@@ -16,10 +16,15 @@ impl FillExt<u8> for [u8] {
     }
 }
 
-pub const WIDTH: usize = 128;
-pub const HEIGHT: usize = 128;
+pub const WIDTH: usize = 1024;
+pub const HEIGHT: usize = 1024;
 pub const PIXELS: usize = WIDTH * HEIGHT;
 pub const NUM_COLORS: usize = 256;
+pub const DEFAULT_COLORS: [u8; 16 * 3] = [
+    0, 0, 0, 29, 43, 83, 126, 37, 83, 0, 135, 81, 171, 82, 54, 95, 87, 79, 194, 195, 199, 255,
+    241, 232, 255, 0, 77, 255, 164, 0, 255, 236, 39, 0, 228, 54, 41, 173, 255, 131, 118, 156,
+    255, 119, 168, 255, 204, 170,
+];
 
 pub struct Point {
     pub x: i32,
@@ -50,7 +55,7 @@ pub static STATE: Container = Container(RefCell::new(State {
 pub static SCREEN: Screen = Screen(RefCell::new([0; PIXELS]));
 pub static PALETTE: Palette = Palette(RefCell::new([0; NUM_COLORS * 3]));
 
-fn wrap_byte(n: i32) -> u8 {
+pub fn wrap_byte(n: i32) -> u8 {
     let mut n = n;
     while n < 0 {
         n += 256;
@@ -58,7 +63,7 @@ fn wrap_byte(n: i32) -> u8 {
     return (n % 256) as u8;
 }
 
-fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
+pub fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
     let mut x0 = x0;
     let mut x1 = x1;
     let mut y0 = y0;
@@ -70,7 +75,7 @@ fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
         x0 = x1;
         x1 = tmp;
     }
-    if (swap_y) {
+    if swap_y {
         let tmp = y0;
         y0 = y1;
         y1 = tmp;
@@ -78,32 +83,41 @@ fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
     (x0, y0, x1, y1)
 }
 
-fn offset_point(x: i32, y: i32) -> (i32, i32) {
+pub fn offset_point(x: i32, y: i32) -> (i32, i32) {
     let state = STATE.0.borrow();
     ((-state.offset.x) + x, (-state.offset.y) + y)
 }
 
-fn is_x_on_screen(x: i32) -> bool {
+pub fn is_x_on_screen(x: i32) -> bool {
     x >= 0 && x < (WIDTH as i32)
 }
 
-fn is_y_on_screen(y: i32) -> bool {
+pub fn is_y_on_screen(y: i32) -> bool {
     y >= 0 && y < (HEIGHT as i32)
 }
 
-fn is_point_on_screen(x: i32, y: i32) -> bool {
+pub fn is_point_on_screen(x: i32, y: i32) -> bool {
     is_x_on_screen(x) && is_y_on_screen(y)
 }
 
-fn limit_x(x: i32) -> i32 {
+pub fn limit_x(x: i32) -> i32 {
     cmp::max(0, cmp::min((WIDTH as i32) - 1, x))
 }
-fn limit_y(y: i32) -> i32 {
+pub fn limit_y(y: i32) -> i32 {
     cmp::max(0, cmp::min((HEIGHT as i32) - 1, y))
 }
 
-fn limit_point(x: i32, y: i32) -> (i32, i32) {
+pub fn limit_point(x: i32, y: i32) -> (i32, i32) {
     (limit_x(x), limit_y(y))
+}
+
+pub fn get_mouse_pos() -> Option<Point> {
+    let state = STATE.0.borrow();
+    if let Some(Point {x, y}) = state.mouse_pos {
+        Some(Point {x,y})
+    } else {
+        None
+    }
 }
 
 pub fn pset(x: i32, y: i32, c: i32) {

@@ -9,15 +9,16 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	const screenHeight = module.screen_height()
 	let viewportWidth
 	let viewportHeight
+	let dim
 	const resize = () => {
-		// const dim = Math.min(
-		// 	Math.floor(window.innerWidth / screenWidth),
-		// 	Math.floor(window.innerHeight / screenHeight)
-		// )
-		const dim = Math.min(
-			window.innerWidth / screenWidth,
-			window.innerHeight / screenHeight
+		dim = Math.min(
+			Math.floor(window.innerWidth / screenWidth),
+			Math.floor(window.innerHeight / screenHeight)
 		)
+		// const dim = Math.min(
+		// 	window.innerWidth / screenWidth,
+		// 	window.innerHeight / screenHeight
+		// )
 		const width = Math.floor(screenHeight * dim)
 		const height = Math.floor(screenWidth * dim)
 		canvas.style.height = `${width}px`
@@ -27,8 +28,28 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		canvas.height = viewportHeight
 		canvas.width = viewportWidth
 	}
+
+	function getMousePos(evt) {
+		var rect = canvas.getBoundingClientRect()
+		return {
+			x: Math.floor((evt.clientX - rect.left) / dim),
+			y: Math.floor((evt.clientY - rect.top) / dim),
+		}
+	}
 	window.addEventListener('resize', resize)
 	resize()
+
+	canvas.addEventListener('mouseleave', e => {
+		module.set_mouse_pos(-1, -1)
+	})
+	canvas.addEventListener('mousemove', e => {
+		const { x, y } = getMousePos(e)
+		module.set_mouse_pos(x, y)
+	})
+	canvas.addEventListener('mouseenter', e => {
+		const { x, y } = getMousePos(e)
+		module.set_mouse_pos(x, y)
+	})
 
 	const fragShaderSource = `
   precision mediump float;
