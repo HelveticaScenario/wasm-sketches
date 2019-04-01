@@ -15,7 +15,7 @@ impl FillExt<u8> for [u8] {
         }
     }
 }
-pub const MAX_SCREEN_SIZE: usize = 1024 * 1024;
+pub const MAX_SCREEN_SIZE: usize = 2048 * 2048;
 pub const NUM_COLORS: usize = 256;
 pub const DEFAULT_COLORS: [u8; 16 * 3] = [
     0, 0, 0, 29, 43, 83, 126, 37, 83, 0, 135, 81, 171, 82, 54, 95, 87, 79, 194, 195, 199, 255, 241,
@@ -32,7 +32,8 @@ pub struct State {
     pub time: u32,
     pub offset: Point,
     pub mouse_pos: Option<Point>,
-    pub dimensions: (usize, usize)
+    pub dimensions: (usize, usize),
+    pub target: u8,
 }
 
 pub struct Container(pub RefCell<State>);
@@ -48,10 +49,14 @@ pub static STATE: Container = Container(RefCell::new(State {
     time: 0,
     offset: Point { x: 0, y: 0 },
     mouse_pos: None,
-    dimensions: (128,128)
+    dimensions: (128, 128),
+    target: 0,
 }));
 
 pub static SCREEN: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
+pub static BUFFER1: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
+pub static BUFFER2: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
+pub static BUFFER3: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
 pub static PALETTE: Palette = Palette(RefCell::new([0; NUM_COLORS * 3]));
 
 pub fn wrap_byte(n: i32) -> u8 {
@@ -80,6 +85,26 @@ pub fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
         y1 = tmp;
     }
     (x0, y0, x1, y1)
+}
+
+pub fn screen<'a>(i: u8) -> std::cell::RefMut<'a, [u8; MAX_SCREEN_SIZE]> {
+    match i {
+        // Match a single value
+        0 => SCREEN.0.borrow_mut(),
+        1 => BUFFER1.0.borrow_mut(),
+        2 => BUFFER2.0.borrow_mut(),
+        3 => BUFFER3.0.borrow_mut(),
+        // Handle the rest of cases
+        _ => panic!("screen index {} no valid", i),
+    }
+}
+
+pub fn get_target() -> u8 {
+    STATE.0.borrow().target
+}
+
+pub fn set_target(target: u8) {
+    STATE.0.borrow_mut().target = target;
 }
 
 pub fn WIDTH() -> usize {
@@ -139,7 +164,7 @@ pub fn pset(x: i32, y: i32, c: i32) {
     let c = wrap_byte(c);
     let (x, y) = offset_point(x, y);
     if is_point_on_screen(x, y) {
-        let mut screen = SCREEN.0.borrow_mut();
+        let mut screen = screen(get_target());
         screen[(y as usize) * WIDTH() + (x as usize)] = c;
     }
 }
@@ -147,7 +172,7 @@ pub fn pset(x: i32, y: i32, c: i32) {
 pub fn pget(x: i32, y: i32) -> Option<u8> {
     let (x, y) = offset_point(x, y);
     if is_point_on_screen(x, y) {
-        let mut screen = SCREEN.0.borrow_mut();
+        let mut screen = screen(get_target());
         Some(screen[(y as usize) * WIDTH() + (x as usize)])
     } else {
         None
@@ -156,7 +181,7 @@ pub fn pget(x: i32, y: i32) -> Option<u8> {
 
 pub fn cls(c: i32) {
     let c = wrap_byte(c);
-    let mut screen = SCREEN.0.borrow_mut();
+    let mut screen = screen(get_target());
     for i in &mut screen[..] {
         *i = c
     }
@@ -206,7 +231,7 @@ pub fn rect(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
     let (x0, y0) = offset_point(x0, y0);
     let (x1, y1) = offset_point(x1, y1);
     let (x0, y0, x1, y1) = rect_swap(x0, y0, x1, y1);
-    let mut screen = SCREEN.0.borrow_mut();
+    let mut screen = screen(get_target());
     let is_x0_on_screen = is_x_on_screen(x0);
     let is_y0_on_screen = is_y_on_screen(y0);
     let is_x1_on_screen = is_x_on_screen(x1);
@@ -248,7 +273,7 @@ pub fn rect_fill(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
         let (x0, y0) = limit_point(x0, y0);
         let (x1, y1) = limit_point(x1, y1);
         let (x0, y0, x1, y1) = rect_swap(x0, y0, x1, y1);
-        let mut screen = SCREEN.0.borrow_mut();
+        let mut screen = screen(get_target());
         for y in (y0 as usize)..((y1 as usize) + 1) {
             let start = y * WIDTH() + (x0 as usize);
             let end = y * WIDTH() + (x1 as usize) + 1;
@@ -304,4 +329,9 @@ pub fn circ_fill(x: i32, y: i32, r: i32, c: i32) {
             decisionOver2 += 2 * (offy - offx) + 1; // Change for y -> y+1, x -> x-1
         }
     }
+}
+
+pub fn copy_screen(source: u8, target: u8) {
+    let size = WIDTH() * HEIGHT();
+    screen(target)[0..size].clone_from_slice(&screen(source)[0..size]);
 }

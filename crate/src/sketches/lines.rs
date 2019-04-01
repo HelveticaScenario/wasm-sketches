@@ -9,12 +9,13 @@ pub struct Lines {}
 impl Sketch for Lines {
     fn new() -> Lines {
         cls(0);
+        set_dimensions(2048, 2048);
         Lines {}
     }
     fn update(&mut self, new_time: u32, old_time: u32) {
         let width = WIDTH();
         let height = HEIGHT();
-        for _ in 0..1 {
+        for _ in 0..200 {
             let x0: u32 = rand::random();
             let x0 = x0 % (width as u32);
             let x1: u32 = rand::random();

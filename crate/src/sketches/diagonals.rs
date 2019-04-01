@@ -22,7 +22,7 @@ impl Sketch for Diagonals {
         
         self.count = self.count % 16;
         let o = self.count;
-        let mut screen = SCREEN.0.borrow_mut();
+        let mut screen = screen(0);
         let height = HEIGHT();
         let width = WIDTH();
         for y in 0..height {

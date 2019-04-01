@@ -12,7 +12,7 @@ impl Sketch for RandStatic {
         RandStatic {}
     }
     fn update(&mut self, new_time: u32, old_time: u32) {
-        let mut screen = SCREEN.0.borrow_mut();
+        let mut screen = screen(0);
         let width = WIDTH();
         let height = HEIGHT();
         for y in 0..height {
