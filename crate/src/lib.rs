@@ -1,20 +1,32 @@
 extern crate rand;
 mod pico;
+mod sketch;
+mod sketches;
 
 use pico::*;
 use rand::prelude::*;
+use sketch::*;
+use sketches::*;
 use std::cell::RefCell;
 use std::cmp;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
+// unsafe impl Sync for SketchContainer<T> {}
+static ACTIVE_SKETCH: SketchContainer = SketchContainer(RefCell::new(None));
+
 #[wasm_bindgen]
-pub fn init() {
+pub fn init(index: usize) {
     set_panic_hook();
     let mut palette = PALETTE.0.borrow_mut();
-
     for i in 0..48 {
         palette[i] = DEFAULT_COLORS[i];
+    }
+
+    let constructor_count = CONSTRUCTORS.0.len();
+    if index < constructor_count {
+        let mut active = ACTIVE_SKETCH.0.borrow_mut();
+        (*active) = Some(CONSTRUCTORS.0[index]());
     }
 }
 fn set_panic_hook() {
@@ -24,26 +36,27 @@ fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-pub struct Sketch1 {
-    last_mouse: Option<Point>,
-}
-
-pub struct Sketch1Container(pub RefCell<Sketch1>);
-unsafe impl Sync for Sketch1Container {}
-
-static SKETCH1: Sketch1Container = Sketch1Container(RefCell::new(Sketch1 { last_mouse: None }));
-
 #[wasm_bindgen]
 pub fn update(delta: f32) {
+    // let mut sketch = ACTIVE_SKETCH.0.borrow_mut();
+    // if let Some(sketch) = sketch {
+    //     sketch.update();
+    // }
+
     let (old, new) = {
         let mut state = STATE.0.borrow_mut();
         let oldTime = (*state).time;
-        let newTime = oldTime + delta.floor() as u32;
+        let newTime = oldTime + delta.round() as u32;
         (*state).time = newTime;
         let old = oldTime;
         let new = newTime;
         (old, new)
     };
+    let active = ACTIVE_SKETCH.0.borrow();
+
+    if let Some(sketch) = active.as_ref() {
+        (*sketch).borrow_mut().update(old, new);
+    }
     // rect_fill(1, 10, 126, -127, 12);
     // for _ in 0..1 {
     //     let x0: u32 = rand::random();
@@ -58,27 +71,7 @@ pub fn update(delta: f32) {
     //     let c = c % 16;
     //     rect_fill(x0 as i32, y0 as i32, x1 as i32, y1 as i32, c as i32);
     // }
-    cls(0);
-    let mouse_pos = get_mouse_pos();
-    let center_x = (WIDTH / 2) as i32;
-    let center_y = (HEIGHT / 2) as i32;
-
-    // let t = (new as f32) / 5000.0;
-    // let mouse_pos = Some(Point {
-    //     x: ((t.sin() * center_x as f32) as i32) + center_x,
-    //     y: ((t.cos() * center_y as f32) as i32) + center_y,
-    // });
-
-    if let Some(Point { x, y }) = mouse_pos {
-        let (x0, y0, x1, y1) = rect_swap(center_x, center_y, x, y);
-        let diff_x = (x - center_x).abs();
-        let diff_y = (y - center_y).abs();
-        let min_diff = (cmp::min(diff_x, diff_y) / 2) + 1;
-        for i in 0..min_diff {
-            rect(x0 + i, y0 + i, x1 - i, y1 - i, (i % 15) + 1);
-        }
-        // rect((WIDTH / 2) as i32, (HEIGHT / 2) as i32, x, y, 12);
-    }
+    
     // if let Some(Point { x: new_x, y: new_y }) = mouse_pos {
     //     let mut sketch_state = SKETCH1.0.borrow_mut();
     //     if let Some(Point {
@@ -117,15 +110,17 @@ pub fn update(delta: f32) {
 #[wasm_bindgen]
 pub fn set_mouse_pos(x: i32, y: i32) {
     let mut state = STATE.0.borrow_mut();
-    if x == -1 && y == -1 {
-        (*state).mouse_pos = None;
-    } else {
-        (*state).mouse_pos = Some(Point { x: x, y: y });
-    }
+    (*state).mouse_pos = Some(Point { x: x, y: y });
 }
 
 #[wasm_bindgen]
-pub fn screen_ptr() -> *mut [u8; PIXELS] {
+pub fn set_mouse_end() {
+    let mut state = STATE.0.borrow_mut();
+    (*state).mouse_pos = None;
+}
+
+#[wasm_bindgen]
+pub fn screen_ptr() -> *mut [u8; MAX_SCREEN_SIZE] {
     SCREEN.0.as_ptr()
 }
 
@@ -136,7 +131,7 @@ pub fn palette_ptr() -> *mut [u8; NUM_COLORS * 3] {
 
 #[wasm_bindgen]
 pub fn screen_size() -> usize {
-    PIXELS
+    WIDTH() * HEIGHT()
 }
 
 #[wasm_bindgen]
@@ -146,10 +141,10 @@ pub fn palette_size() -> usize {
 
 #[wasm_bindgen]
 pub fn screen_width() -> usize {
-    WIDTH
+    WIDTH()
 }
 
 #[wasm_bindgen]
 pub fn screen_height() -> usize {
-    HEIGHT
+    HEIGHT()
 }

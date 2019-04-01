@@ -1,8 +1,37 @@
+function getQueryVariable(variable) {
+	var query = window.location.search.substring(1)
+	var vars = query.split('&')
+	for (var i = 0; i < vars.length; i++) {
+		var pair = vars[i].split('=')
+		if (decodeURIComponent(pair[0]) == variable) {
+			return decodeURIComponent(pair[1])
+		}
+	}
+	console.log('Query variable %s not found', variable)
+}
+
+const linearMode = getQueryVariable('linear') === 'true'
+const thirty = getQueryVariable('thirty') === 'true'
+
 import('../crate/pkg/rust_webpack_bg').then(module => {
+	const regex = /^\/sketch(\d)\/?$/
+	const match = regex.exec(location.pathname)
+	if (match == null) {
+		document.body.textContent = 'Sketch Not Found'
+		return
+	}
+	const index = parseInt(match[1])
+	if (isNaN(index) || index < 1) {
+		document.body.textContent = 'Sketch Not Found'
+		return
+	}
 	const canvas = document.getElementById('canvas')
 	const gl = canvas.getContext('webgl')
+	console.log('init')
 
-	module.init()
+	console.log(index)
+	console.log(module.init(index - 1))
+
 	const screenSize = module.screen_size()
 	const paletteSize = module.palette_size()
 	const screenWidth = module.screen_width()
@@ -36,11 +65,20 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 			y: Math.floor((evt.clientY - rect.top) / dim),
 		}
 	}
+
+	function getTouchPos(evt) {
+		var rect = canvas.getBoundingClientRect()
+		return {
+			x: Math.floor((evt.touches[0].clientX - rect.left) / dim),
+			y: Math.floor((evt.touches[0].clientY - rect.top) / dim),
+		}
+	}
+
 	window.addEventListener('resize', resize)
 	resize()
 
 	canvas.addEventListener('mouseleave', e => {
-		module.set_mouse_pos(-1, -1)
+		module.set_mouse_end()
 	})
 	canvas.addEventListener('mousemove', e => {
 		const { x, y } = getMousePos(e)
@@ -48,6 +86,24 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	})
 	canvas.addEventListener('mouseenter', e => {
 		const { x, y } = getMousePos(e)
+		module.set_mouse_pos(x, y)
+	})
+
+	canvas.addEventListener('touchend', e => {
+		e.preventDefault()
+		e.stopImmediatePropagation()
+		module.set_mouse_end()
+	})
+	canvas.addEventListener('touchstart', e => {
+		e.preventDefault()
+		e.stopImmediatePropagation()
+		const { x, y } = getTouchPos(e)
+		module.set_mouse_pos(x, y)
+	})
+	canvas.addEventListener('touchmove', e => {
+		e.preventDefault()
+		e.stopImmediatePropagation()
+		const { x, y } = getTouchPos(e)
 		module.set_mouse_pos(x, y)
 	})
 
@@ -157,7 +213,15 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 
 	let count = 0
 	let last = performance.now()
+	let toggle = false
 	const run = now => {
+		count++
+		count = count % 16
+		window.requestAnimationFrame(run)
+		toggle = !toggle
+		if (thirty && !toggle) {
+			return
+		}
 		// console.log(Math.floor(now - last));
 		module.update(Math.floor(now - last))
 		last = now
@@ -171,24 +235,37 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		gl.vertexAttribPointer(textureCoordsAttribute, 2, gl.FLOAT, false, 0, 0)
 		gl.activeTexture(gl.TEXTURE0)
 		gl.bindTexture(gl.TEXTURE_2D, screenTexture)
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MIN_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MAG_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 		gl.uniform1i(screenUniform, 0)
 		gl.activeTexture(gl.TEXTURE1)
 		gl.bindTexture(gl.TEXTURE_2D, paletteTexture)
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MIN_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MAG_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 		gl.uniform1i(paletteUniform, 1)
 		gl.drawArrays(gl.TRIANGLES, 0, 6)
 
 		// console.log(screen[0])
-		count++
-		count = count % 16
-		window.requestAnimationFrame(run)
 	}
 	run()
 })
@@ -205,8 +282,16 @@ function createShader(gl, source, type) {
 function createTexture(gl) {
 	const texture = gl.createTexture()
 	gl.bindTexture(gl.TEXTURE_2D, texture)
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.texParameteri(
+		gl.TEXTURE_2D,
+		gl.TEXTURE_MIN_FILTER,
+		linearMode ? gl.LINEAR : gl.NEAREST
+	)
+	gl.texParameteri(
+		gl.TEXTURE_2D,
+		gl.TEXTURE_MAG_FILTER,
+		linearMode ? gl.LINEAR : gl.NEAREST
+	)
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 	return texture
