@@ -15,7 +15,19 @@ impl FillExt<u8> for [u8] {
         }
     }
 }
-pub const MAX_SCREEN_SIZE: usize = 2048 * 2048;
+
+impl FillExt<i32> for [i32] {
+    fn fill(&mut self, v: i32) {
+        for i in self {
+            *i = v
+        }
+    }
+}
+
+pub const MAX_WIDTH: usize = 2048;
+pub const MAX_HEIGHT: usize = 2048;
+
+pub const MAX_SCREEN_SIZE: usize = MAX_WIDTH * MAX_HEIGHT;
 pub const NUM_COLORS: usize = 256;
 pub const DEFAULT_COLORS: [u8; 16 * 3] = [
     0, 0, 0, 29, 43, 83, 126, 37, 83, 0, 135, 81, 171, 82, 54, 95, 87, 79, 194, 195, 199, 255, 241,
@@ -28,12 +40,22 @@ pub struct Point {
     pub y: i32,
 }
 
+pub struct ClipRect {
+    pub l: i32,
+    pub t: i32,
+    pub r: i32,
+    pub b: i32,
+}
+
 pub struct State {
     pub time: u32,
     pub offset: Point,
     pub mouse_pos: Option<Point>,
     pub dimensions: (usize, usize),
     pub target: u8,
+    pub sides_buffer_left: [i32; MAX_HEIGHT],
+    pub sides_buffer_right: [i32; MAX_HEIGHT],
+    pub clip_rect: ClipRect,
 }
 
 pub struct Container(pub RefCell<State>);
@@ -51,6 +73,14 @@ pub static STATE: Container = Container(RefCell::new(State {
     mouse_pos: None,
     dimensions: (128, 128),
     target: 0,
+    sides_buffer_left: [0; MAX_HEIGHT],
+    sides_buffer_right: [0; MAX_HEIGHT],
+    clip_rect: ClipRect {
+        l: 0,
+        t: 0,
+        r: MAX_WIDTH as i32,
+        b: MAX_HEIGHT as i32,
+    },
 }));
 
 pub static SCREEN: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
@@ -115,6 +145,28 @@ pub fn HEIGHT() -> usize {
     STATE.0.borrow().dimensions.1
 }
 
+pub fn init_sides_buffer() {
+    let width = WIDTH() as i32;
+    let height = HEIGHT();
+    let mut state = STATE.0.borrow_mut();
+    state.sides_buffer_left[0..height].fill(width);
+    state.sides_buffer_right[0..height].fill(-1);
+}
+
+pub fn set_side_pixel(x: i32, y: i32) {
+    let height = HEIGHT() as i32;
+    if y >= 0 && y < height {
+        let y = y as usize;
+        let mut state = STATE.0.borrow_mut();
+        if x < state.sides_buffer_left[y] {
+            state.sides_buffer_left[y] = x;
+        }
+        if x > state.sides_buffer_right[y] {
+            state.sides_buffer_right[y] = x;
+        }
+    }
+}
+
 pub fn set_dimensions(width: usize, height: usize) {
     if width * height > MAX_SCREEN_SIZE {
         panic!();
@@ -157,6 +209,28 @@ pub fn get_mouse_pos() -> Option<Point> {
         Some(Point { x, y })
     } else {
         None
+    }
+}
+
+pub fn set_clip(x: i32, y: i32, w: i32, h: i32) {
+    let mut state = STATE.0.borrow_mut();
+    state.clip_rect.l = x;
+    state.clip_rect.t = y;
+    state.clip_rect.r = x + w;
+    state.clip_rect.b = y + h;
+    let Width = WIDTH() as i32;
+    let Height = HEIGHT() as i32;
+    if state.clip_rect.l < 0 {
+        state.clip_rect.l = 0;
+    }
+    if state.clip_rect.t < 0 {
+        state.clip_rect.t = 0;
+    }
+    if state.clip_rect.r > Width {
+        state.clip_rect.r = Width;
+    }
+    if state.clip_rect.b > Height {
+        state.clip_rect.b = Height;
     }
 }
 
@@ -274,9 +348,10 @@ pub fn rect_fill(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
         let (x1, y1) = limit_point(x1, y1);
         let (x0, y0, x1, y1) = rect_swap(x0, y0, x1, y1);
         let mut screen = screen(get_target());
+        let width = WIDTH();
         for y in (y0 as usize)..((y1 as usize) + 1) {
-            let start = y * WIDTH() + (x0 as usize);
-            let end = y * WIDTH() + (x1 as usize) + 1;
+            let start = y * width + (x0 as usize);
+            let end = y * width + (x1 as usize) + 1;
             screen[start..end].fill(c);
         }
     }
@@ -308,27 +383,93 @@ pub fn circ(x: i32, y: i32, r: i32, c: i32) {
     }
 }
 
-pub fn circ_fill(x: i32, y: i32, r: i32, c: i32) {
-    if r < 1 {
-        return;
-    };
-    let mut offx = r;
-    let mut offy = 0;
-    let mut decisionOver2 = 1 - offx; // Decision criterion divided by 2 evaluated at x=y=0
+pub fn circ_fill(xm: i32, ym: i32, radius: i32, c: i32) {
+    // if r < 1 {
+    //     return;
+    // };
+    // let mut offx = r;
+    // let mut offy = 0;
+    // let mut decisionOver2 = 1 - offx; // Decision criterion divided by 2 evaluated at x=y=0
 
-    while offy <= offx {
-        line(offx + x, offy + y, -offx + x, offy + y, c); // Octant 1
-        line(offy + x, offx + y, -offy + x, offx + y, c); // Octant 2
-        line(-offx + x, -offy + y, offx + x, -offy + y, c); // Octant 5
-        line(-offy + x, -offx + y, offy + x, -offx + y, c); // Octant 6
-        offy += 1;
-        if decisionOver2 <= 0 {
-            decisionOver2 += 2 * offy + 1; // Change in decision criterion for y -> y+1
-        } else {
-            offx -= 1;
-            decisionOver2 += 2 * (offy - offx) + 1; // Change for y -> y+1, x -> x-1
+    // while offy <= offx {
+    //     line(offx + x, offy + y, -offx + x, offy + y, c); // Octant 1
+    //     line(offy + x, offx + y, -offy + x, offx + y, c); // Octant 2
+    //     line(-offx + x, -offy + y, offx + x, -offy + y, c); // Octant 5
+    //     line(-offy + x, -offx + y, offy + x, -offx + y, c); // Octant 6
+    //     offy += 1;
+    //     if decisionOver2 <= 0 {
+    //         decisionOver2 += 2 * offy + 1; // Change in decision criterion for y -> y+1
+    //     } else {
+    //         offx -= 1;
+    //         decisionOver2 += 2 * (offy - offx) + 1; // Change for y -> y+1, x -> x-1
+    //     }
+    // }
+
+    if (radius <= 0) {
+        pset(xm, ym, c);
+        return;
+    }
+    if (radius == 1) {
+        circ(xm, ym, radius, c);
+        pset(xm, ym, c);
+        return;
+    }
+    init_sides_buffer();
+
+    let mut r = radius;
+    let mut x = -r;
+    let mut y = 0;
+    let mut err = 2 - 2 * r;
+
+    set_side_pixel(xm - x, ym + y);
+    set_side_pixel(xm - y, ym - x);
+    set_side_pixel(xm + x, ym - y);
+    set_side_pixel(xm + y, ym + x);
+
+    r = err;
+    if (r <= y) {
+        y += 1;
+        err += y * 2 + 1;
+    }
+    if (r > x || err > y) {
+        x += 1;
+        err += x * 2 + 1;
+    }
+    while (x < 0) {
+        set_side_pixel(xm - x, ym + y);
+        set_side_pixel(xm - y, ym - x);
+        set_side_pixel(xm + x, ym - y);
+        set_side_pixel(xm + y, ym + x);
+
+        r = err;
+        if (r <= y) {
+            y += 1;
+            err += y * 2 + 1;
+        }
+        if (r > x || err > y) {
+            x += 1;
+            err += x * 2 + 1;
         }
     }
+
+    let yt = cmp::max(0, ym - radius);
+    let height = HEIGHT() as i32;
+    let yb = cmp::min(height, ym + radius + 1);
+    let c = wrap_byte(c);
+    let state = STATE.0.borrow();
+    for _y in yt..yb {
+        let _y = _y as usize;
+        let xl = cmp::max(state.sides_buffer_left[_y], state.clip_rect.l) as usize;
+        let xr = cmp::min(state.sides_buffer_right[_y], state.clip_rect.r - 1) as usize;
+        hline(xl, xr, _y, c);
+    }
+}
+
+pub fn hline(x0: usize, x1: usize, y: usize, c: u8) {
+    let width = WIDTH();
+    let start = y * width + (x0 as usize);
+    let end = y * width + (x1 as usize) + 1;
+    screen(get_target())[start..end].fill(c);
 }
 
 pub fn copy_screen(source: u8, target: u8) {
