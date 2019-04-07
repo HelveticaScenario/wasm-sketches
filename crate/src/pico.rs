@@ -56,6 +56,7 @@ pub struct State {
     pub sides_buffer_left: [i32; MAX_HEIGHT],
     pub sides_buffer_right: [i32; MAX_HEIGHT],
     pub clip_rect: ClipRect,
+    pub transparency: [bool; NUM_COLORS],
 }
 
 pub struct Container(pub RefCell<State>);
@@ -66,6 +67,9 @@ unsafe impl Sync for Screen {}
 
 pub struct Palette(pub RefCell<[u8; NUM_COLORS * 3]>);
 unsafe impl Sync for Palette {}
+
+pub struct PaletteSwap(pub RefCell<[u8; NUM_COLORS]>);
+unsafe impl Sync for PaletteSwap {}
 
 pub static STATE: Container = Container(RefCell::new(State {
     time: 0,
@@ -81,6 +85,7 @@ pub static STATE: Container = Container(RefCell::new(State {
         r: MAX_WIDTH as i32,
         b: MAX_HEIGHT as i32,
     },
+    transparency: [false; NUM_COLORS],
 }));
 
 pub static SCREEN: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
@@ -88,6 +93,7 @@ pub static BUFFER1: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
 pub static BUFFER2: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
 pub static BUFFER3: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
 pub static PALETTE: Palette = Palette(RefCell::new([0; NUM_COLORS * 3]));
+pub static PALETTE_SWAP: PaletteSwap = PaletteSwap(RefCell::new([0; NUM_COLORS]));
 
 pub fn wrap_byte(n: i32) -> u8 {
     let mut n = n;
@@ -153,7 +159,7 @@ pub fn init_sides_buffer() {
     state.sides_buffer_right[0..height].fill(-1);
 }
 
-pub fn set_side_pixel(x: i32, y: i32) {
+pub fn set_side_pixel(x: i32, y: i32, _: i32) {
     let height = HEIGHT() as i32;
     if y >= 0 && y < height {
         let y = y as usize;
@@ -172,6 +178,8 @@ pub fn set_dimensions(width: usize, height: usize) {
         panic!();
     }
     let mut state = STATE.0.borrow_mut();
+    state.clip_rect.r = width as i32;
+    state.clip_rect.b = height as i32;
     (*state).dimensions = (width, height);
 }
 
@@ -253,6 +261,11 @@ pub fn pget(x: i32, y: i32) -> Option<u8> {
     }
 }
 
+pub fn palt(c: u8, t: bool) {
+    let mut state = STATE.0.borrow_mut();
+    state.transparency[c as usize] = t;
+}
+
 pub fn cls(c: i32) {
     let c = wrap_byte(c);
     let mut screen = screen(get_target());
@@ -267,12 +280,7 @@ pub fn camera_set(x: i32, y: i32) {
     (*state).offset.y = y;
 }
 
-pub fn line(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
-    if y0 == y1 {
-        rect_fill(x0, y0, x1, y1, c);
-        return;
-    }
-
+fn line_with_pixel_func(x0: i32, y0: i32, x1: i32, y1: i32, c: i32, func: &Fn(i32, i32, i32)) {
     let (mut x0, mut y0) = offset_point(x0, y0);
     let (x1, y1) = offset_point(x1, y1);
 
@@ -284,7 +292,7 @@ pub fn line(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
     let mut e2;
 
     loop {
-        pset(x0, y0, c);
+        func(x0, y0, c);
         if x0 == x1 && y0 == y1 {
             break;
         }
@@ -297,6 +305,51 @@ pub fn line(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
             err += dx;
             y0 += sy;
         }
+    }
+}
+
+pub fn line(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
+    if y0 == y1 {
+        rect_fill(x0, y0, x1, y1, c);
+        return;
+    }
+    line_with_pixel_func(x0, y0, x1, y1, c, &pset);
+}
+
+pub fn fat_line(x0: i32, y0: i32, x1: i32, y1: i32, half_width: i32, caps: bool, c: i32) {
+    let mut x = (x1 - x0) as f32;
+    let mut y = (y1 - y0) as f32;
+    let mag = ((x * x).abs() + (y * y).abs()).sqrt();
+    x /= mag;
+    y /= mag;
+
+    let (norm_x, norm_y) = (y, (-x));
+    let (norm_x, norm_y) = (
+        (norm_x * half_width as f32) as i32,
+        (norm_y * half_width as f32) as i32,
+    );
+
+    tri_fill(
+        x0 - norm_x,
+        y0 - norm_y,
+        x1 - norm_x,
+        y1 - norm_y,
+        x0 + norm_x,
+        y0 + norm_y,
+        c,
+    );
+    tri_fill(
+        x1 - norm_x,
+        y1 - norm_y,
+        x0 + norm_x,
+        y0 + norm_y,
+        x1 + norm_x,
+        y1 + norm_y,
+        c,
+    );
+    if caps {
+        circ_fill(x1, y1, half_width, c);
+        circ_fill(x0, y0, half_width, c);
     }
 }
 
@@ -357,110 +410,87 @@ pub fn rect_fill(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
     }
 }
 
-pub fn circ(x: i32, y: i32, r: i32, c: i32) {
-    if r < 1 {
+pub fn circ_with_pixel_func(xm: i32, ym: i32, radius: i32, c: i32, func: &Fn(i32, i32, i32)) {
+    if radius < 1 {
         return;
     };
-    let mut offx = r;
-    let mut offy = 0;
-    let mut decisionOver2 = 1 - offx; // Decision criterion divided by 2 evaluated at x=r, y=0
-    while offy <= offx {
-        pset(offx + x, offy + y, c); // Octant 1
-        pset(offy + x, offx + y, c); // Octant 2
-        pset(-offx + x, offy + y, c); // Octant 4
-        pset(-offy + x, offx + y, c); // Octant 3
-        pset(-offx + x, -offy + y, c); // Octant 5
-        pset(-offy + x, -offx + y, c); // Octant 6
-        pset(offx + x, -offy + y, c); // Octant 7
-        pset(offy + x, -offx + y, c); // Octant 8
-        offy += 1;
-        if decisionOver2 <= 0 {
-            decisionOver2 += 2 * offy + 1; // Change in decision criterion for y -> y+1
-        } else {
-            offx -= 1;
-            decisionOver2 += 2 * (offy - offx) + 1; // Change for y -> y+1, x -> x-1
-        }
-    }
-}
-
-pub fn circ_fill(xm: i32, ym: i32, radius: i32, c: i32) {
-    // if r < 1 {
-    //     return;
-    // };
-    // let mut offx = r;
-    // let mut offy = 0;
-    // let mut decisionOver2 = 1 - offx; // Decision criterion divided by 2 evaluated at x=y=0
-
-    // while offy <= offx {
-    //     line(offx + x, offy + y, -offx + x, offy + y, c); // Octant 1
-    //     line(offy + x, offx + y, -offy + x, offx + y, c); // Octant 2
-    //     line(-offx + x, -offy + y, offx + x, -offy + y, c); // Octant 5
-    //     line(-offy + x, -offx + y, offy + x, -offx + y, c); // Octant 6
-    //     offy += 1;
-    //     if decisionOver2 <= 0 {
-    //         decisionOver2 += 2 * offy + 1; // Change in decision criterion for y -> y+1
-    //     } else {
-    //         offx -= 1;
-    //         decisionOver2 += 2 * (offy - offx) + 1; // Change for y -> y+1, x -> x-1
-    //     }
-    // }
-
-    if (radius <= 0) {
-        pset(xm, ym, c);
-        return;
-    }
-    if (radius == 1) {
-        circ(xm, ym, radius, c);
-        pset(xm, ym, c);
-        return;
-    }
-    init_sides_buffer();
-
     let mut r = radius;
     let mut x = -r;
     let mut y = 0;
     let mut err = 2 - 2 * r;
 
-    set_side_pixel(xm - x, ym + y);
-    set_side_pixel(xm - y, ym - x);
-    set_side_pixel(xm + x, ym - y);
-    set_side_pixel(xm + y, ym + x);
-
-    r = err;
-    if (r <= y) {
-        y += 1;
-        err += y * 2 + 1;
-    }
-    if (r > x || err > y) {
-        x += 1;
-        err += x * 2 + 1;
-    }
-    while (x < 0) {
-        set_side_pixel(xm - x, ym + y);
-        set_side_pixel(xm - y, ym - x);
-        set_side_pixel(xm + x, ym - y);
-        set_side_pixel(xm + y, ym + x);
+    let mut first = true;
+    while first || x < 0 {
+        first = false;
+        func(xm - x, ym + y, c);
+        func(xm - y, ym - x, c);
+        func(xm + x, ym - y, c);
+        func(xm + y, ym + x, c);
 
         r = err;
-        if (r <= y) {
+        if r <= y {
             y += 1;
             err += y * 2 + 1;
         }
-        if (r > x || err > y) {
+        if r > x || err > y {
             x += 1;
             err += x * 2 + 1;
         }
     }
+}
 
-    let yt = cmp::max(0, ym - radius);
-    let height = HEIGHT() as i32;
-    let yb = cmp::min(height, ym + radius + 1);
-    let c = wrap_byte(c);
+pub fn circ(x: i32, y: i32, r: i32, c: i32) {
+    circ_with_pixel_func(x, y, r, c, &pset);
+}
+
+pub fn circ_fill(x: i32, y: i32, r: i32, c: i32) {
+    if (r <= 0) {
+        pset(x, y, c);
+        return;
+    }
+    if (r == 1) {
+        circ(x, y, r, c);
+        pset(x, y, c);
+        return;
+    }
+    init_sides_buffer();
+    circ_with_pixel_func(x, y, r, c, &set_side_pixel);
+
     let state = STATE.0.borrow();
+    let yt = cmp::max(state.clip_rect.t, y - r);
+    let height = HEIGHT() as i32;
+    let yb = cmp::min(state.clip_rect.b, y + r + 1);
+    let c = wrap_byte(c);
     for _y in yt..yb {
         let _y = _y as usize;
         let xl = cmp::max(state.sides_buffer_left[_y], state.clip_rect.l) as usize;
         let xr = cmp::min(state.sides_buffer_right[_y], state.clip_rect.r - 1) as usize;
+        hline(xl, xr, _y, c);
+    }
+}
+
+pub fn tri(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
+    line(x0, y0, x1, y1, c);
+    line(x1, y1, x2, y2, c);
+    line(x2, y2, x0, y0, c);
+}
+
+pub fn tri_fill(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
+    init_sides_buffer();
+    line_with_pixel_func(x0, y0, x1, y1, c, &set_side_pixel);
+    line_with_pixel_func(x1, y1, x2, y2, c, &set_side_pixel);
+    line_with_pixel_func(x2, y2, x0, y0, c, &set_side_pixel);
+
+    let c = wrap_byte(c);
+    let state = STATE.0.borrow();
+    let yt = cmp::max(state.clip_rect.t, cmp::min(y0, cmp::min(y1, y2)));
+    let height = HEIGHT() as i32;
+    let yb = cmp::min(state.clip_rect.b, cmp::max(y0, cmp::max(y1, y2)) + 1);
+
+    for _y in yt..yb {
+        let _y = _y as usize;
+        let xl = cmp::max(state.sides_buffer_left[_y], state.clip_rect.l) as usize;
+        let xr = cmp::min(state.sides_buffer_right[_y] + 1, state.clip_rect.r - 1) as usize;
         hline(xl, xr, _y, c);
     }
 }
@@ -475,4 +505,17 @@ pub fn hline(x0: usize, x1: usize, y: usize, c: u8) {
 pub fn copy_screen(source: u8, target: u8) {
     let size = WIDTH() * HEIGHT();
     screen(target)[0..size].clone_from_slice(&screen(source)[0..size]);
+}
+
+pub fn copy_screen_with_transparency(source: u8, target: u8) {
+    let size = WIDTH() * HEIGHT();
+    let mut target_screen = screen(target);
+    let source_screen = screen(source);
+    let transparency = &(STATE.0.borrow().transparency);
+    for i in 0..size {
+        let source_color = source_screen[i];
+        if (!transparency[source_color as usize]) {
+            target_screen[i] = source_color;
+        }
+    }
 }

@@ -34,6 +34,7 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 
 	const screenSize = module.screen_size()
 	const paletteSize = module.palette_size()
+	const swapSize = module.palette_swap_size()
 	const screenWidth = module.screen_width()
 	const screenHeight = module.screen_height()
 	let viewportWidth
@@ -109,24 +110,6 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		module.set_mouse_pos(x, y)
 	})
 
-	const fragShaderSource = `
-  precision mediump float;
-  precision mediump int;
-  
-  uniform sampler2D u_palette;     //256 x 1 pixels
-  uniform sampler2D u_screen;
-  varying vec2 v_texCoord;
-  
-  void main()
-  {
-      //What color do we want to index?
-      vec4 index = texture2D(u_screen, v_texCoord);
-      //Do a dependency texture read
-      vec4 texel = texture2D(u_palette, index.xy);
-      gl_FragColor = texel;   //Output the color
-  }
-  `
-
 	const vertShaderSource = `
   precision mediump float;
   precision mediump int;
@@ -140,8 +123,32 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
       gl_Position = vec4(a_position,0, 1);
   }`
 
-	const fragShader = createShader(gl, fragShaderSource, gl.FRAGMENT_SHADER)
+	const fragShaderSource = `
+  precision mediump float;
+  precision mediump int;
+  
+	uniform sampler2D u_palette;     //256 x 1 pixels
+	uniform sampler2D u_swap;        //256 x 1 pixels
+  uniform sampler2D u_screen;
+  varying vec2 v_texCoord;
+  
+  void main()
+  {		
+      gl_FragColor = texture2D(
+				u_palette,
+				texture2D(
+					u_swap,
+					texture2D(
+						u_screen,
+						v_texCoord
+					).xy
+				).xy
+			);
+  }
+  `
+
 	const vertShader = createShader(gl, vertShaderSource, gl.VERTEX_SHADER)
+	const fragShader = createShader(gl, fragShaderSource, gl.FRAGMENT_SHADER)
 	const program = gl.createProgram()
 	gl.attachShader(program, vertShader)
 	gl.attachShader(program, fragShader)
@@ -155,10 +162,12 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	const vertexPositionAttribute = gl.getAttribLocation(program, 'a_position')
 	const textureCoordsAttribute = gl.getAttribLocation(program, 'a_texCoord')
 	const paletteUniform = gl.getUniformLocation(program, 'u_palette')
+	const swapUniform = gl.getUniformLocation(program, 'u_swap')
 	const screenUniform = gl.getUniformLocation(program, 'u_screen')
 	gl.enableVertexAttribArray(vertexPositionAttribute)
 	gl.enableVertexAttribArray(textureCoordsAttribute)
 	const paletteTexture = createTexture(gl)
+	const swapTexture = createTexture(gl)
 	const screenTexture = createTexture(gl)
 	const vertBuffer = gl.createBuffer()
 	gl.bindBuffer(gl.ARRAY_BUFFER, vertBuffer)
@@ -181,6 +190,11 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		module.screen_ptr(),
 		screenSize
 	)
+	const swap = new Uint8Array(
+		module.memory.buffer,
+		module.palette_swap_ptr(),
+		swapSize
+	)
 	const palette = new Uint8Array(
 		module.memory.buffer,
 		module.palette_ptr(),
@@ -198,6 +212,18 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 			gl.LUMINANCE,
 			gl.UNSIGNED_BYTE,
 			screen
+		)
+		gl.bindTexture(gl.TEXTURE_2D, swapTexture)
+		gl.texImage2D(
+			gl.TEXTURE_2D,
+			0,
+			gl.LUMINANCE,
+			swapSize,
+			1,
+			0,
+			gl.LUMINANCE,
+			gl.UNSIGNED_BYTE,
+			swap
 		)
 		gl.bindTexture(gl.TEXTURE_2D, paletteTexture)
 		gl.texImage2D(
@@ -235,6 +261,7 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		gl.vertexAttribPointer(vertexPositionAttribute, 2, gl.FLOAT, false, 0, 0)
 		gl.bindBuffer(gl.ARRAY_BUFFER, uvBuffer)
 		gl.vertexAttribPointer(textureCoordsAttribute, 2, gl.FLOAT, false, 0, 0)
+
 		gl.activeTexture(gl.TEXTURE0)
 		gl.bindTexture(gl.TEXTURE_2D, screenTexture)
 		gl.texParameteri(
@@ -250,7 +277,24 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
 		gl.uniform1i(screenUniform, 0)
+
 		gl.activeTexture(gl.TEXTURE1)
+		gl.bindTexture(gl.TEXTURE_2D, swapTexture)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MIN_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
+		gl.texParameteri(
+			gl.TEXTURE_2D,
+			gl.TEXTURE_MAG_FILTER,
+			linearMode ? gl.LINEAR : gl.NEAREST
+		)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.uniform1i(swapUniform, 1)
+
+		gl.activeTexture(gl.TEXTURE2)
 		gl.bindTexture(gl.TEXTURE_2D, paletteTexture)
 		gl.texParameteri(
 			gl.TEXTURE_2D,
@@ -264,7 +308,8 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-		gl.uniform1i(paletteUniform, 1)
+		gl.uniform1i(paletteUniform, 2)
+
 		gl.drawArrays(gl.TRIANGLES, 0, 6)
 
 		// console.log(screen[0])

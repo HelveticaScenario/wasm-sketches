@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate web_sys;
 mod pico;
 mod sketch;
 mod sketches;
@@ -18,9 +19,21 @@ static ACTIVE_SKETCH: SketchContainer = SketchContainer(RefCell::new(None));
 #[wasm_bindgen]
 pub fn init(index: usize) {
     set_panic_hook();
-    let mut palette = PALETTE.0.borrow_mut();
-    for i in 0..48 {
-        palette[i] = DEFAULT_COLORS[i];
+    {
+        let mut palette = PALETTE.0.borrow_mut();
+        for i in 0..48 {
+            palette[i] = DEFAULT_COLORS[i];
+        }
+    }
+    {
+        let mut palette_swap = PALETTE_SWAP.0.borrow_mut();
+        for i in 0..NUM_COLORS {
+            palette_swap[i] = i as u8;
+        }
+    }
+    {
+        let mut state = STATE.0.borrow_mut();
+        state.transparency[0] = true;
     }
 
     let constructor_count = CONSTRUCTORS.0.len();
@@ -71,7 +84,7 @@ pub fn update(delta: f32) {
     //     let c = c % 16;
     //     rect_fill(x0 as i32, y0 as i32, x1 as i32, y1 as i32, c as i32);
     // }
-    
+
     // if let Some(Point { x: new_x, y: new_y }) = mouse_pos {
     //     let mut sketch_state = SKETCH1.0.borrow_mut();
     //     if let Some(Point {
@@ -127,6 +140,16 @@ pub fn screen_ptr() -> *mut [u8; MAX_SCREEN_SIZE] {
 #[wasm_bindgen]
 pub fn palette_ptr() -> *mut [u8; NUM_COLORS * 3] {
     PALETTE.0.as_ptr()
+}
+
+#[wasm_bindgen]
+pub fn palette_swap_ptr() -> *mut [u8; NUM_COLORS] {
+    PALETTE_SWAP.0.as_ptr()
+}
+
+#[wasm_bindgen]
+pub fn palette_swap_size() -> usize {
+    NUM_COLORS
 }
 
 #[wasm_bindgen]
