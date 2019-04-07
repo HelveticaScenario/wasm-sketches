@@ -75,7 +75,7 @@ impl Sketch for Erase {
                     let y0 = (y * height_mult);
                     let x1 = x0 + width_mult;
                     let y1 = y0 + height_mult;
-                    let c = (x + y + (offset/2) as usize) % 16;
+                    let c = (x + y + (offset / 2) as usize) % 16;
                     rect_fill(x0 as i32, y0 as i32, x1 as i32, y1 as i32, c as i32);
                 }
             }
