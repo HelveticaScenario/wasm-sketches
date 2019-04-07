@@ -534,3 +534,125 @@ pub fn copy_screen_with_transparency_mask(source: u8, target: u8, mask: u8) {
         }
     }
 }
+
+// TODO: can be optomized to use clone_from_slice
+pub fn copy_sprite(
+    source: u8,
+    target: u8,
+    source_x: i32,
+    source_y: i32,
+    target_x: i32,
+    target_y: i32,
+    width: usize,
+    height: usize,
+) {
+    let mut target_screen = screen(target);
+    let source_screen = screen(source);
+    let screen_width = WIDTH();
+    let screen_height = HEIGHT();
+    if screen_width == 0 || screen_height == 0 {
+        return;
+    }
+
+    let source_clip_rect = ClipRect {
+        l: cmp::max(0, source_x),
+        r: cmp::min(screen_width as i32, source_x + width as i32),
+        t: cmp::max(0, source_y),
+        b: cmp::min(screen_height as i32, source_y + height as i32),
+    };
+    let target_clip_rect = ClipRect {
+        l: cmp::max(0, target_x),
+        r: cmp::min(screen_width as i32, target_x + width as i32),
+        t: cmp::max(0, target_y),
+        b: cmp::min(screen_height as i32, target_y + height as i32),
+    };
+    for y in 0..height {
+        let source_pixel_y = source_y + y as i32;
+        let target_pixel_y = target_y + y as i32;
+        if source_pixel_y >= source_clip_rect.t
+            && source_pixel_y < source_clip_rect.b
+            && target_pixel_y >= target_clip_rect.t
+            && target_pixel_y < target_clip_rect.b
+        {
+            for x in 0..width {
+                let source_pixel_x = source_x + x as i32;
+                let target_pixel_x = target_x + x as i32;
+                if source_pixel_x >= source_clip_rect.l
+                    && source_pixel_x < source_clip_rect.r
+                    && target_pixel_x >= target_clip_rect.l
+                    && target_pixel_x < target_clip_rect.r
+                {
+                    let source_pixel_x = source_pixel_x as usize;
+                    let source_pixel_y = source_pixel_y as usize;
+                    let target_pixel_x = target_pixel_x as usize;
+                    let target_pixel_y = target_pixel_y as usize;
+                    target_screen[(target_pixel_y * screen_width + target_pixel_x) as usize] =
+                        source_screen[(source_pixel_y * screen_width + source_pixel_x) as usize];
+                }
+            }
+        }
+    }
+}
+
+pub fn copy_sprite_with_transparency(
+    source: u8,
+    target: u8,
+    source_x: i32,
+    source_y: i32,
+    target_x: i32,
+    target_y: i32,
+    width: usize,
+    height: usize,
+) {
+    let mut target_screen = screen(target);
+    let source_screen = screen(source);
+    let transparency = &(STATE.0.borrow().transparency);
+    let screen_width = WIDTH();
+    let screen_height = HEIGHT();
+    if screen_width == 0 || screen_height == 0 {
+        return;
+    }
+
+    let source_clip_rect = ClipRect {
+        l: cmp::max(0, source_x),
+        r: cmp::min(screen_width as i32, source_x + width as i32),
+        t: cmp::max(0, source_y),
+        b: cmp::min(screen_height as i32, source_y + height as i32),
+    };
+    let target_clip_rect = ClipRect {
+        l: cmp::max(0, target_x),
+        r: cmp::min(screen_width as i32, target_x + width as i32),
+        t: cmp::max(0, target_y),
+        b: cmp::min(screen_height as i32, target_y + height as i32),
+    };
+    for y in 0..height {
+        let source_pixel_y = source_y + y as i32;
+        let target_pixel_y = target_y + y as i32;
+        if source_pixel_y >= source_clip_rect.t
+            && source_pixel_y < source_clip_rect.b
+            && target_pixel_y >= target_clip_rect.t
+            && target_pixel_y < target_clip_rect.b
+        {
+            for x in 0..width {
+                let source_pixel_x = source_x + x as i32;
+                let target_pixel_x = target_x + x as i32;
+                if source_pixel_x >= source_clip_rect.l
+                    && source_pixel_x < source_clip_rect.r
+                    && target_pixel_x >= target_clip_rect.l
+                    && target_pixel_x < target_clip_rect.r
+                {
+                    let source_pixel_x = source_pixel_x as usize;
+                    let source_pixel_y = source_pixel_y as usize;
+                    let target_pixel_x = target_pixel_x as usize;
+                    let target_pixel_y = target_pixel_y as usize;
+                    let source_color =
+                        source_screen[(source_pixel_y * screen_width + source_pixel_x) as usize];
+                    if !transparency[source_color as usize] {
+                        target_screen[(target_pixel_y * screen_width + target_pixel_x) as usize] =
+                            source_color
+                    }
+                }
+            }
+        }
+    }
+}
