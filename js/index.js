@@ -41,16 +41,16 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	let viewportHeight
 	let dim
 	const resize = () => {
-		dim = Math.min(
-			Math.floor(window.innerWidth / screenWidth),
-			Math.floor(window.innerHeight / screenHeight)
-		)
-		if (dim < 1) {
+		// dim = Math.min(
+		// 	Math.floor(window.innerWidth / screenWidth),
+		// 	Math.floor(window.innerHeight / screenHeight)
+		// )
+		// if (dim < 1) {
 			dim = Math.min(
 				window.innerWidth / screenWidth,
 				window.innerHeight / screenHeight
 			)
-		}
+		// }
 		const width = Math.floor(screenHeight * dim)
 		const height = Math.floor(screenWidth * dim)
 		canvas.style.height = `${width}px`
