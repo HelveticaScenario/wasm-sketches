@@ -519,3 +519,18 @@ pub fn copy_screen_with_transparency(source: u8, target: u8) {
         }
     }
 }
+
+pub fn copy_screen_with_transparency_mask(source: u8, target: u8, mask: u8) {
+    let size = WIDTH() * HEIGHT();
+    let mut target_screen = screen(target);
+    let source_screen = screen(source);
+    let mask_screen = screen(mask);
+    let transparency = &(STATE.0.borrow().transparency);
+    for i in 0..size {
+        let source_color = source_screen[i];
+        let mask_color = mask_screen[i];
+        if (transparency[mask_color as usize]) {
+            target_screen[i] = source_color;
+        }
+    }
+}

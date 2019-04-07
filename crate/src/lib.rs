@@ -36,10 +36,10 @@ pub fn init(index: usize) {
         state.transparency[0] = true;
     }
 
-    let constructor_count = CONSTRUCTORS.0.len();
+    let constructor_count = SKETCHES.len();
     if index < constructor_count {
         let mut active = ACTIVE_SKETCH.0.borrow_mut();
-        (*active) = Some(CONSTRUCTORS.0[index]());
+        (*active) = Some((SKETCHES[index].constructor)());
     }
 }
 fn set_panic_hook() {

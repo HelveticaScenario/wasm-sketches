@@ -25,6 +25,14 @@ impl Sketch for RandStatic {
     }
 }
 
-pub fn new_rand_static() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(RandStatic::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Random Static",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

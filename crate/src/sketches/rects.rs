@@ -30,6 +30,14 @@ impl Sketch for Rects {
     }
 }
 
-pub fn new_rects() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(Rects::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Rectangles",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

@@ -140,6 +140,14 @@ impl Sketch for Erase {
     }
 }
 
-pub fn new_erase() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(Erase::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Erase",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

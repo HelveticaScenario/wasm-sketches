@@ -1,10 +1,9 @@
-use std::cell::RefCell;
 use rand::prelude::*;
+use std::cell::RefCell;
 use std::cmp;
 
 use crate::pico::*;
 use crate::sketch::*;
-
 
 pub struct CircleRect {}
 
@@ -38,6 +37,14 @@ impl Sketch for CircleRect {
     }
 }
 
-pub fn new_circleRect() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(CircleRect::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Circle-Rectangles",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

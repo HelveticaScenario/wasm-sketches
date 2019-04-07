@@ -12,7 +12,7 @@ pub struct Erase2 {
 
 impl Sketch for Erase2 {
     fn new() -> Erase2 {
-        set_dimensions(512, 512);
+        set_dimensions(1024, 1024);
         set_target(0);
         cls(0);
         set_target(1);
@@ -29,6 +29,7 @@ impl Sketch for Erase2 {
         //         screen[i] = (num % 15) + 1;
         //     }
         // }
+
         let width = 128;
         let width_mult = real_width / width;
         let height = 128;
@@ -50,7 +51,7 @@ impl Sketch for Erase2 {
         //     }
         // }
         palt(0, false);
-        palt(1, true);
+        palt(16, true);
         Erase2 {
             last_mouse: None,
             radius: 10,
@@ -61,7 +62,7 @@ impl Sketch for Erase2 {
         set_target(1);
         self.count += 1;
         self.count = self.count % (16 * 8);
-        let offset = self.count;
+        let offset = self.count as usize;
         {
             let real_width = WIDTH();
             let real_height = HEIGHT();
@@ -75,7 +76,7 @@ impl Sketch for Erase2 {
                     let y0 = (y * height_mult);
                     let x1 = x0 + width_mult;
                     let y1 = y0 + height_mult;
-                    let c = (x + y + offset as usize) % 16;
+                    let c = (x + y + (offset / 2) as usize) % 16;
                     rect_fill(x0 as i32, y0 as i32, x1 as i32, y1 as i32, c as i32);
                 }
             }
@@ -90,7 +91,7 @@ impl Sketch for Erase2 {
             }) = self.last_mouse
             {
                 if new_x == last_x && new_y == last_y {
-                    circ_fill(new_x, new_y, self.radius, 1);
+                    circ_fill(new_x, new_y, self.radius, 16);
                 } else {
                     // let mut x = (new_x - last_x) as f32;
                     // let mut y = (new_y - last_y) as f32;
@@ -124,10 +125,10 @@ impl Sketch for Erase2 {
                     // );
                     // circ_fill(new_x, new_y, self.radius, 1);
                     // circ_fill(last_x, last_y, self.radius, 1);
-                    fat_line(last_x, last_y, new_x, new_y, self.radius, true, 1);
+                    fat_line(last_x, last_y, new_x, new_y, self.radius, true, 16);
                 }
             } else {
-                circ_fill(new_x, new_y, self.radius, 1);
+                circ_fill(new_x, new_y, self.radius, 16);
             }
             self.last_mouse = Some(Point { x: new_x, y: new_y });
         } else {
@@ -135,11 +136,40 @@ impl Sketch for Erase2 {
                 self.last_mouse = None;
             }
         }
-        copy_screen(1, 0);
-        copy_screen_with_transparency(2, 0);
+        set_target(0);
+        {
+            let real_width = WIDTH();
+            let real_height = HEIGHT();
+            let width = 128;
+            let width_mult = real_width / width;
+            let height = 128;
+            let height_mult = real_height / height;
+            for y in 0..height {
+                for x in 0..width {
+                    let x0 = (x * width_mult);
+                    let y0 = (y * height_mult);
+                    let x1 = x0 + width_mult;
+                    let y1 = y0 + height_mult;
+                    let v = (y as i32) * -2 + x as i32 + (offset / 4) as i32;
+                    let c = wrap_byte(v) % 16;
+                    rect_fill(x0 as i32, y0 as i32, x1 as i32, y1 as i32, c as i32);
+                }
+            }
+        }
+        // copy_screen(1, 0);
+        // copy_screen_with_transparency(2, 0);
+        copy_screen_with_transparency_mask(1, 0, 2);
     }
 }
 
-pub fn new_erase2() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(Erase2::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Erase 2",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

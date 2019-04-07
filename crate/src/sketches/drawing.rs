@@ -45,6 +45,14 @@ impl Sketch for Drawing {
     }
 }
 
-pub fn new_drawing() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(Drawing::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Drawing",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};

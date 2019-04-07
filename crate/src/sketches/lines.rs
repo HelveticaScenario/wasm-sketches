@@ -31,6 +31,14 @@ impl Sketch for Lines {
     }
 }
 
-pub fn new_lines() -> Box<RefCell<Sketch>> {
+pub fn new() -> Box<RefCell<Sketch>> {
     Box::new(RefCell::new(Lines::new())) as Box<RefCell<Sketch>>
 }
+
+pub static sketch: SketchDescriptor = SketchDescriptor {
+    name: "Lines",
+    constructor: &new,
+    mobile: true,
+    desktop: true,
+    public: true,
+};
