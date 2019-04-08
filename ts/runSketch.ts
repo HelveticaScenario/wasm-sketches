@@ -1,4 +1,7 @@
-function getQueryVariable(variable) {
+import { uw } from './utils'
+import { SketchDescription, WasmModule } from './wasmContext'
+
+function getQueryVariable(variable: string) {
 	var query = window.location.search.substring(1)
 	var vars = query.split('&')
 	for (var i = 0; i < vars.length; i++) {
@@ -13,43 +16,67 @@ function getQueryVariable(variable) {
 const linearMode = getQueryVariable('linear') === 'true'
 const thirty = getQueryVariable('thirty') === 'true'
 
-import('../crate/pkg/rust_webpack_bg').then(module => {
-	const regex = /^\/sketch(\d)\/?$/
-	const match = regex.exec(location.pathname)
-	if (match == null) {
-		document.body.textContent = 'Sketch Not Found'
-		return
+function createShader(gl: WebGLRenderingContext, source: string, type: number) {
+	const shader = uw(gl.createShader(type))
+	gl.shaderSource(shader, source)
+	gl.compileShader(shader)
+	if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+		return shader
 	}
-	const index = parseInt(match[1])
-	if (isNaN(index) || index < 1) {
-		document.body.textContent = 'Sketch Not Found'
-		return
-	}
-	const canvas = document.getElementById('canvas')
-	const gl = canvas.getContext('webgl')
+	let msg = uw(gl.getShaderInfoLog(shader))
+	alert(msg)
+	throw new Error(msg)
+}
+
+function createTexture(gl: WebGLRenderingContext) {
+	const texture = gl.createTexture()
+	gl.bindTexture(gl.TEXTURE_2D, texture)
+	gl.texParameteri(
+		gl.TEXTURE_2D,
+		gl.TEXTURE_MIN_FILTER,
+		linearMode ? gl.LINEAR : gl.NEAREST
+	)
+	gl.texParameteri(
+		gl.TEXTURE_2D,
+		gl.TEXTURE_MAG_FILTER,
+		linearMode ? gl.LINEAR : gl.NEAREST
+	)
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	return texture
+}
+
+export default (
+	canvas: HTMLCanvasElement,
+	sketch: SketchDescription,
+	module: WasmModule
+) => {
+	const memory: WebAssembly.Memory = module.get_memory()
+	const { index } = sketch
+	const gl = uw(canvas.getContext('webgl'))
 	console.log('init')
 
 	console.log(index)
-	console.log(module.init(index - 1))
+	console.log(module.init(index))
 
 	const screenSize = module.screen_size()
 	const paletteSize = module.palette_size()
 	const swapSize = module.palette_swap_size()
 	const screenWidth = module.screen_width()
 	const screenHeight = module.screen_height()
-	let viewportWidth
-	let viewportHeight
-	let dim
+	let viewportWidth: number
+	let viewportHeight: number
+	let dim: number
 	const resize = () => {
 		// dim = Math.min(
 		// 	Math.floor(window.innerWidth / screenWidth),
 		// 	Math.floor(window.innerHeight / screenHeight)
 		// )
 		// if (dim < 1) {
-			dim = Math.min(
-				window.innerWidth / screenWidth,
-				window.innerHeight / screenHeight
-			)
+		dim = Math.min(
+			window.innerWidth / screenWidth,
+			window.innerHeight / screenHeight
+		)
 		// }
 		const width = Math.floor(screenHeight * dim)
 		const height = Math.floor(screenWidth * dim)
@@ -61,7 +88,7 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		canvas.width = viewportWidth
 	}
 
-	function getMousePos(evt) {
+	function getMousePos(evt: MouseEvent) {
 		var rect = canvas.getBoundingClientRect()
 		return {
 			x: Math.floor((evt.clientX - rect.left) / dim),
@@ -69,7 +96,7 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 		}
 	}
 
-	function getTouchPos(evt) {
+	function getTouchPos(evt: TouchEvent) {
 		var rect = canvas.getBoundingClientRect()
 		return {
 			x: Math.floor((evt.touches[0].clientX - rect.left) / dim),
@@ -113,10 +140,10 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	const vertShaderSource = `
   precision mediump float;
   precision mediump int;
-  
+
   attribute vec2 a_position;
   attribute vec2 a_texCoord;
-  
+
   varying vec2 v_texCoord;
   void main() {
       v_texCoord = a_texCoord;
@@ -126,14 +153,14 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	const fragShaderSource = `
   precision mediump float;
   precision mediump int;
-  
+
 	uniform sampler2D u_palette;     //256 x 1 pixels
 	uniform sampler2D u_swap;        //256 x 1 pixels
   uniform sampler2D u_screen;
   varying vec2 v_texCoord;
-  
+
   void main()
-  {		
+  {
       gl_FragColor = texture2D(
 				u_palette,
 				texture2D(
@@ -149,7 +176,7 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 
 	const vertShader = createShader(gl, vertShaderSource, gl.VERTEX_SHADER)
 	const fragShader = createShader(gl, fragShaderSource, gl.FRAGMENT_SHADER)
-	const program = gl.createProgram()
+	const program = uw(gl.createProgram())
 	gl.attachShader(program, vertShader)
 	gl.attachShader(program, fragShader)
 	gl.linkProgram(program)
@@ -185,18 +212,14 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	)
 	gl.clearColor(0, 0, 0, 1)
 	gl.enable(gl.DEPTH_TEST)
-	const screen = new Uint8Array(
-		module.memory.buffer,
-		module.screen_ptr(),
-		screenSize
-	)
+	const screen = new Uint8Array(memory.buffer, module.screen_ptr(), screenSize)
 	const swap = new Uint8Array(
-		module.memory.buffer,
+		memory.buffer,
 		module.palette_swap_ptr(),
 		swapSize
 	)
 	const palette = new Uint8Array(
-		module.memory.buffer,
+		memory.buffer,
 		module.palette_ptr(),
 		paletteSize
 	)
@@ -242,10 +265,15 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 	let count = 0
 	let last = performance.now()
 	let toggle = false
-	const run = now => {
+	return (now: number) => {
+		// if (!canvas.parentNode) {
+		// 	console.log('removed')
+		// 	return
+		// }
+
 		count++
 		count = count % 16
-		window.requestAnimationFrame(run)
+		// window.requestAnimationFrame(run)
 		toggle = !toggle
 		if (thirty && !toggle) {
 			return
@@ -314,32 +342,4 @@ import('../crate/pkg/rust_webpack_bg').then(module => {
 
 		// console.log(screen[0])
 	}
-	run()
-})
-
-function createShader(gl, source, type) {
-	const shader = gl.createShader(type)
-	gl.shaderSource(shader, source)
-	gl.compileShader(shader)
-	if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-		return shader
-	}
-	alert(gl.getShaderInfoLog(shader))
-}
-function createTexture(gl) {
-	const texture = gl.createTexture()
-	gl.bindTexture(gl.TEXTURE_2D, texture)
-	gl.texParameteri(
-		gl.TEXTURE_2D,
-		gl.TEXTURE_MIN_FILTER,
-		linearMode ? gl.LINEAR : gl.NEAREST
-	)
-	gl.texParameteri(
-		gl.TEXTURE_2D,
-		gl.TEXTURE_MAG_FILTER,
-		linearMode ? gl.LINEAR : gl.NEAREST
-	)
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
-	return texture
 }

@@ -11,12 +11,14 @@ use sketches::*;
 use std::cell::RefCell;
 use std::cmp;
 use std::rc::Rc;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen as bindgen;
+use wasm_bindgen::prelude::JsValue;
+// use wasm_bindgen::wasm_bindgen_macro::wasm_bindgen as bindgen:
 
 // unsafe impl Sync for SketchContainer<T> {}
 static ACTIVE_SKETCH: SketchContainer = SketchContainer(RefCell::new(None));
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn init(index: usize) {
     set_panic_hook();
     {
@@ -49,7 +51,7 @@ fn set_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn update(delta: f32) {
     // let mut sketch = ACTIVE_SKETCH.0.borrow_mut();
     // if let Some(sketch) = sketch {
@@ -120,54 +122,109 @@ pub fn update(delta: f32) {
     // }
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn set_mouse_pos(x: i32, y: i32) {
     let mut state = STATE.0.borrow_mut();
     (*state).mouse_pos = Some(Point { x: x, y: y });
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn set_mouse_end() {
     let mut state = STATE.0.borrow_mut();
     (*state).mouse_pos = None;
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn screen_ptr() -> *mut [u8; MAX_SCREEN_SIZE] {
     SCREEN.0.as_ptr()
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn palette_ptr() -> *mut [u8; NUM_COLORS * 3] {
     PALETTE.0.as_ptr()
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn palette_swap_ptr() -> *mut [u8; NUM_COLORS] {
     PALETTE_SWAP.0.as_ptr()
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn palette_swap_size() -> usize {
     NUM_COLORS
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn screen_size() -> usize {
     WIDTH() * HEIGHT()
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn palette_size() -> usize {
     NUM_COLORS * 4
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn screen_width() -> usize {
     WIDTH()
 }
 
-#[wasm_bindgen]
+#[bindgen]
 pub fn screen_height() -> usize {
     HEIGHT()
+}
+
+#[bindgen]
+pub fn get_sketch_count() -> usize {
+    SKETCHES.len()
+}
+
+#[bindgen]
+pub fn get_sketch_url(i: usize) -> Option<String> {
+    if i < SKETCHES.len() {
+        Some(SKETCHES[i].url.into())
+    } else {
+        None
+    }
+}
+
+#[bindgen]
+pub fn get_sketch_name(i: usize) -> Option<String> {
+    if i < SKETCHES.len() {
+        Some(SKETCHES[i].name.into())
+    } else {
+        None
+    }
+}
+
+#[bindgen]
+pub fn get_sketch_is_mobile(i: usize) -> Option<bool> {
+    if i < SKETCHES.len() {
+        Some(SKETCHES[i].mobile)
+    } else {
+        None
+    }
+}
+
+#[bindgen]
+pub fn get_sketch_is_desktop(i: usize) -> Option<bool> {
+    if i < SKETCHES.len() {
+        Some(SKETCHES[i].desktop)
+    } else {
+        None
+    }
+}
+
+#[bindgen]
+pub fn get_sketch_is_public(i: usize) -> Option<bool> {
+    if i < SKETCHES.len() {
+        Some(SKETCHES[i].public)
+    } else {
+        None
+    }
+}
+
+#[bindgen]
+pub fn get_memory() -> JsValue {
+    wasm_bindgen::memory()
 }

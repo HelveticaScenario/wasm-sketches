@@ -150,4 +150,5 @@ pub static sketch: SketchDescriptor = SketchDescriptor {
     mobile: true,
     desktop: true,
     public: true,
+    url: "erase",
 };

@@ -15,5 +15,6 @@ pub struct SketchDescriptor {
      pub mobile: bool,
      pub desktop: bool,
      pub public: bool,
+     pub url: &'static str,
 }
 unsafe impl Sync for SketchDescriptor {}
