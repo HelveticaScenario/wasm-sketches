@@ -35,9 +35,15 @@ pub fn init(index: usize) {
     }
     {
         let mut state = STATE.0.borrow_mut();
+        (state.transparency).fill(false);
         state.transparency[0] = true;
+        state.time = 0;
+        state.mouse_pos = None;
+        state.offset.x = 0;
+        state.offset.y = 0;
     }
-
+    set_dimensions(128,128);
+    set_target(0);
     let constructor_count = SKETCHES.len();
     if index < constructor_count {
         let mut active = ACTIVE_SKETCH.0.borrow_mut();

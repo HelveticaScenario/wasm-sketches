@@ -4,7 +4,7 @@ use std::cmp;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
-trait FillExt<T> {
+pub trait FillExt<T> {
     fn fill(&mut self, v: T);
 }
 
@@ -18,6 +18,14 @@ impl FillExt<u8> for [u8] {
 
 impl FillExt<i32> for [i32] {
     fn fill(&mut self, v: i32) {
+        for i in self {
+            *i = v
+        }
+    }
+}
+
+impl FillExt<bool> for [bool] {
+    fn fill(&mut self, v: bool) {
         for i in self {
             *i = v
         }
@@ -178,6 +186,8 @@ pub fn set_dimensions(width: usize, height: usize) {
         panic!();
     }
     let mut state = STATE.0.borrow_mut();
+    state.clip_rect.t = 0;
+    state.clip_rect.l = 0;
     state.clip_rect.r = width as i32;
     state.clip_rect.b = height as i32;
     (*state).dimensions = (width, height);

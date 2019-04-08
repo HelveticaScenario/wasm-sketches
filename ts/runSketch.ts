@@ -47,13 +47,13 @@ function createTexture(gl: WebGLRenderingContext) {
 }
 
 export default (
+	gl: WebGLRenderingContext,
 	canvas: HTMLCanvasElement,
 	sketch: SketchDescription,
 	module: WasmModule
 ) => {
 	const memory: WebAssembly.Memory = module.get_memory()
 	const { index } = sketch
-	const gl = uw(canvas.getContext('webgl'))
 	console.log('init')
 
 	console.log(index)

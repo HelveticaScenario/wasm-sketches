@@ -8,8 +8,8 @@ pub struct Lines {}
 
 impl Sketch for Lines {
     fn new() -> Lines {
-        cls(0);
         set_dimensions(2048, 2048);
+        cls(0);
         Lines {}
     }
     fn update(&mut self, new_time: u32, old_time: u32) {

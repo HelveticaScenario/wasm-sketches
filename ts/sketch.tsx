@@ -17,6 +17,8 @@ export default class Sketch extends React.Component<SketchProps, {}> {
 	context!: React.ContextType<typeof WasmContext>
 	canvasRef: React.RefObject<HTMLCanvasElement>
 	run?: (now: number) => void
+	canvas?: HTMLCanvasElement
+	gl?: WebGLRenderingContext
 	constructor(props: SketchProps) {
 		super(props)
 		this.canvasRef = React.createRef()
@@ -26,7 +28,12 @@ export default class Sketch extends React.Component<SketchProps, {}> {
 		const { sketch } = props
 		const { module } = unwrapContextValue(this.context)
 		const canvas = uw(this.canvasRef.current)
-		const run = runSketch(canvas, sketch, module)
+
+		if (canvas !== this.canvas) {
+			this.canvas = canvas
+			this.gl = uw(canvas.getContext('webgl'))
+		}
+		const run = runSketch(uw(this.gl), uw(this.canvas), sketch, module)
 		this.run = run
 
 		const raf = (now: number) => {
