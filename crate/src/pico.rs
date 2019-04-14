@@ -55,8 +55,16 @@ pub struct ClipRect {
     pub b: i32,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum MouseButtonState {
+    UpThisFrame,
+    Up,
+    DownThisFrame,
+    Down,
+}
+
 pub struct State {
-    pub time: u32,
+    pub time: f32,
     pub offset: Point,
     pub mouse_pos: Option<Point>,
     pub dimensions: (usize, usize),
@@ -65,6 +73,9 @@ pub struct State {
     pub sides_buffer_right: [i32; MAX_HEIGHT],
     pub clip_rect: ClipRect,
     pub transparency: [bool; NUM_COLORS],
+    pub mouse_buttons: [MouseButtonState; 5],
+    pub scroll: f64,
+    pub scroll_delta: f64,
 }
 
 pub struct Container(pub RefCell<State>);
@@ -80,7 +91,7 @@ pub struct PaletteSwap(pub RefCell<[u8; NUM_COLORS]>);
 unsafe impl Sync for PaletteSwap {}
 
 pub static STATE: Container = Container(RefCell::new(State {
-    time: 0,
+    time: 0.0,
     offset: Point { x: 0, y: 0 },
     mouse_pos: None,
     dimensions: (128, 128),
@@ -94,6 +105,9 @@ pub static STATE: Container = Container(RefCell::new(State {
         b: MAX_HEIGHT as i32,
     },
     transparency: [false; NUM_COLORS],
+    mouse_buttons: [MouseButtonState::Up; 5],
+    scroll: 0.0,
+    scroll_delta: 0.0,
 }));
 
 pub static SCREEN: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
@@ -111,7 +125,10 @@ pub fn wrap_byte(n: i32) -> u8 {
     return (n % 256) as u8;
 }
 
-pub fn rect_swap(x0: i32, y0: i32, x1: i32, y1: i32) -> (i32, i32, i32, i32) {
+pub fn rect_swap<A>(x0: A, y0: A, x1: A, y1: A) -> (A, A, A, A)
+where
+    A: PartialOrd,
+{
     let mut x0 = x0;
     let mut x1 = x1;
     let mut y0 = y0;
@@ -227,6 +244,38 @@ pub fn get_mouse_pos() -> Option<Point> {
         Some(Point { x, y })
     } else {
         None
+    }
+}
+
+pub fn get_scroll() -> (f64, f64) {
+    let state = STATE.0.borrow();
+    (state.scroll, state.scroll_delta)
+}
+
+pub fn get_mouse_btn(btn: u8) -> MouseButtonState {
+    let state = STATE.0.borrow();
+    if (btn as usize) < state.mouse_buttons.len() {
+        state.mouse_buttons[btn as usize]
+    } else {
+        MouseButtonState::Up
+    }
+}
+
+pub fn btn(btn_num: u8) -> bool {
+    match get_mouse_btn(btn_num) {
+        MouseButtonState::Up => false,
+        MouseButtonState::UpThisFrame => false,
+        MouseButtonState::Down => true,
+        MouseButtonState::DownThisFrame => true,
+    }
+}
+
+pub fn btn_this_frame(btn_num: u8) -> bool {
+    match get_mouse_btn(btn_num) {
+        MouseButtonState::Up => false,
+        MouseButtonState::UpThisFrame => true,
+        MouseButtonState::Down => false,
+        MouseButtonState::DownThisFrame => true,
     }
 }
 

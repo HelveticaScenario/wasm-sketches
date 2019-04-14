@@ -42,7 +42,7 @@ export default class Sketch extends React.Component<SketchProps, {}> {
 				run(now)
 			}
 		}
-		raf(performance.now())
+		requestAnimationFrame(raf)
 	}
 
 	componentDidMount() {

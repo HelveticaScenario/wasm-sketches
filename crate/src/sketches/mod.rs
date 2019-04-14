@@ -4,6 +4,7 @@ pub mod drawing;
 pub mod erase;
 pub mod erase2;
 pub mod lines;
+pub mod mandlebrot;
 pub mod rand_static;
 pub mod rects;
 use crate::sketch::*;
@@ -17,4 +18,5 @@ pub static SKETCHES: &[&SketchDescriptor] = &[
     &drawing::sketch,
     &erase::sketch,
     &erase2::sketch,
+    &mandlebrot::sketch,
 ];

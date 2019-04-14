@@ -4,7 +4,7 @@ pub trait Sketch {
      fn new() -> Self
      where
           Self: Sized;
-     fn update(&mut self, new_time: u32, old_time: u32);
+     fn update(&mut self, new_time: f32, old_time: f32);
 }
 pub struct SketchContainer(pub RefCell<Option<Box<RefCell<Sketch>>>>);
 unsafe impl Sync for SketchContainer {}

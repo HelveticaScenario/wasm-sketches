@@ -14,7 +14,7 @@ impl Sketch for Diagonals {
         // set_dimensions(256, 512);
         Diagonals { count: 0 }
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         // let o = new_time / 16;
         self.count += 1;
 

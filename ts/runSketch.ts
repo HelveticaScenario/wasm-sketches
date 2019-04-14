@@ -104,6 +104,12 @@ export default (
 		}
 	}
 
+	canvas.addEventListener('contextmenu', e => {
+		e.preventDefault()
+		e.stopImmediatePropagation()
+		return false
+	})
+
 	window.addEventListener('resize', resize)
 	resize()
 
@@ -117,6 +123,35 @@ export default (
 	canvas.addEventListener('mouseenter', e => {
 		const { x, y } = getMousePos(e)
 		module.set_mouse_pos(x, y)
+	})
+
+	canvas.addEventListener('mousedown', e => {
+		e.preventDefault()
+		e.stopPropagation()
+		const btn = e.button
+		module.set_mouse_button(btn, true)
+		const onUp = (e: MouseEvent) => {
+			if (e.button === btn) {
+				module.set_mouse_button(btn, false)
+				window.removeEventListener('mouseup', onUp)
+			}
+		}
+		window.addEventListener('mouseup', onUp)
+	})
+
+	canvas.addEventListener('wheel', e => {
+		e.preventDefault()
+		e.stopPropagation()
+		module.set_wheel(e.deltaY)
+		// const btn = e.button
+		// module.set_mouse_button(btn, true)
+		// const onUp = (e: MouseEvent) => {
+		// 	if (e.button === btn) {
+		// 		module.set_mouse_button(btn, false)
+		// 		window.removeEventListener('mouseup', onUp)
+		// 	}
+		// }
+		// window.addEventListener('mouseup', onUp)
 	})
 
 	canvas.addEventListener('touchend', e => {
@@ -263,7 +298,7 @@ export default (
 	}
 
 	let count = 0
-	let last = performance.now()
+	let last: number
 	let toggle = false
 	return (now: number) => {
 		// if (!canvas.parentNode) {
@@ -278,8 +313,10 @@ export default (
 		if (thirty && !toggle) {
 			return
 		}
-		// console.log(Math.floor(now - last));
-		module.update(Math.floor(now - last))
+		if (last == null) {
+			last = now
+		}
+		module.update(now - last)
 		last = now
 
 		gl.viewport(0, 0, viewportWidth, viewportHeight)

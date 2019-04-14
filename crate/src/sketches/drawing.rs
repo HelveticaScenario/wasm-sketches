@@ -6,6 +6,7 @@ use std::cmp;
 
 pub struct Drawing {
     pub last_mouse: Option<Point>,
+    pub count: u8,
 }
 
 impl Sketch for Drawing {
@@ -15,19 +16,24 @@ impl Sketch for Drawing {
         set_target(1);
         cls(0);
         // set_dimensions(256, 512);
-        Drawing { last_mouse: None }
+        Drawing {
+            last_mouse: None,
+            count: 0,
+        }
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         set_target(1);
         let mouse_pos = get_mouse_pos();
         if let Some(Point { x: new_x, y: new_y }) = mouse_pos {
-            let c: u8 = rand::random();
+            let c: u8 = self.count + 1;
             let c = (c % 15) + 1;
             if let Some(Point {
                 x: last_x,
                 y: last_y,
             }) = self.last_mouse
             {
+                self.count += 1;
+                self.count = self.count % 15;
                 line(last_x, last_y, new_x, new_y, c as i32);
             } else {
                 pset(new_x, new_y, c as i32);

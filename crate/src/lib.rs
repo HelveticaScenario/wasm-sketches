@@ -37,12 +37,12 @@ pub fn init(index: usize) {
         let mut state = STATE.0.borrow_mut();
         (state.transparency).fill(false);
         state.transparency[0] = true;
-        state.time = 0;
+        state.time = 0.0;
         state.mouse_pos = None;
         state.offset.x = 0;
         state.offset.y = 0;
     }
-    set_dimensions(128,128);
+    set_dimensions(128, 128);
     set_target(0);
     let constructor_count = SKETCHES.len();
     if index < constructor_count {
@@ -59,15 +59,10 @@ fn set_panic_hook() {
 
 #[bindgen]
 pub fn update(delta: f32) {
-    // let mut sketch = ACTIVE_SKETCH.0.borrow_mut();
-    // if let Some(sketch) = sketch {
-    //     sketch.update();
-    // }
-
     let (old, new) = {
         let mut state = STATE.0.borrow_mut();
         let oldTime = (*state).time;
-        let newTime = oldTime + delta.round() as u32;
+        let newTime = oldTime + delta;
         (*state).time = newTime;
         let old = oldTime;
         let new = newTime;
@@ -77,6 +72,18 @@ pub fn update(delta: f32) {
 
     if let Some(sketch) = active.as_ref() {
         (*sketch).borrow_mut().update(old, new);
+    }
+    for i in STATE.0.borrow_mut().mouse_buttons.iter_mut() {
+        *i = match *i {
+            MouseButtonState::UpThisFrame => MouseButtonState::Up,
+            MouseButtonState::DownThisFrame => MouseButtonState::Down,
+            MouseButtonState::Up => MouseButtonState::Up,
+            MouseButtonState::Down => MouseButtonState::Down,
+        };
+    }
+    {
+        let mut state = STATE.0.borrow_mut();
+        state.scroll_delta = 0.0;
     }
     // rect_fill(1, 10, 126, -127, 12);
     // for _ in 0..1 {
@@ -138,6 +145,18 @@ pub fn set_mouse_pos(x: i32, y: i32) {
 pub fn set_mouse_end() {
     let mut state = STATE.0.borrow_mut();
     (*state).mouse_pos = None;
+}
+
+#[bindgen]
+pub fn set_mouse_button(btn_num: u8, down: bool) {
+    let mut state = STATE.0.borrow_mut();
+    if (btn_num as usize) < state.mouse_buttons.len() {
+        (*state).mouse_buttons[btn_num as usize] = if down {
+            MouseButtonState::DownThisFrame
+        } else {
+            MouseButtonState::UpThisFrame
+        };
+    }
 }
 
 #[bindgen]
@@ -233,4 +252,11 @@ pub fn get_sketch_is_public(i: usize) -> Option<bool> {
 #[bindgen]
 pub fn get_memory() -> JsValue {
     wasm_bindgen::memory()
+}
+
+#[bindgen]
+pub fn set_wheel(delta: f64) {
+    let mut state = STATE.0.borrow_mut();
+    (*state).scroll += delta;
+    (*state).scroll_delta = delta;
 }

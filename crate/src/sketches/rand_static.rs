@@ -11,7 +11,7 @@ impl Sketch for RandStatic {
         cls(0);
         RandStatic {}
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         let mut screen = screen(0);
         let width = WIDTH();
         let height = HEIGHT();

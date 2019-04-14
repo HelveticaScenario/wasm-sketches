@@ -12,7 +12,7 @@ impl Sketch for CircleRect {
         cls(0);
         CircleRect {}
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         cls(0);
         // let mouse_pos = get_mouse_pos();
         let center_x = (WIDTH() / 2) as i32;

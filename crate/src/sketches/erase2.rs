@@ -58,7 +58,7 @@ impl Sketch for Erase2 {
             count: 0,
         }
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         set_target(1);
         self.count += 1;
         self.count = self.count % (16 * 8);

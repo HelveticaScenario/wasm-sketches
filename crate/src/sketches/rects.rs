@@ -11,7 +11,7 @@ impl Sketch for Rects {
         cls(0);
         Rects {}
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         let width = WIDTH();
         let height = HEIGHT();
         for _ in 0..1 {

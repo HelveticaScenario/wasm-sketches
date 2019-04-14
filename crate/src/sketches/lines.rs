@@ -12,7 +12,7 @@ impl Sketch for Lines {
         cls(0);
         Lines {}
     }
-    fn update(&mut self, new_time: u32, old_time: u32) {
+    fn update(&mut self, new_time: f32, old_time: f32) {
         let width = WIDTH();
         let height = HEIGHT();
         for _ in 0..200 {
