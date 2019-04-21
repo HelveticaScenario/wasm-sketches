@@ -1,6 +1,8 @@
 use crate::pico::*;
 use crate::sketch::*;
 use std::cell::RefCell;
+use wasm_bindgen::prelude::*;
+use web_sys::console::log_1;
 
 use std::cmp;
 
@@ -34,12 +36,6 @@ impl Sketch for Mandlebrot {
                 l: 0.0,
                 r: width as f64,
             },
-            // clip_rect: ClipRectFloat {
-            //     t: 0.0 + height as f64 / 4.0,
-            //     b: height as f64 - height as f64 / 4.0,
-            //     l: 0.0 + width as f64 / 4.0,
-            //     r: width as f64 - width as f64 / 4.0,
-            // },
             first_point: None,
             started: false,
             width: width as f64,
@@ -51,19 +47,199 @@ impl Sketch for Mandlebrot {
         m
     }
     fn update(&mut self, new_time: f32, old_time: f32) {
-        let (scroll, scroll_delta) = get_scroll();
-        self.offset = wrap_byte(scroll as i32) % 16;
-        if scroll_delta != 0.0 {
+        let pointer_state_changed = has_any_pointer_state_changed();
+        let pointer_pos_changed = has_any_pointer_position_changed();
+        let scroll_changed = has_scroll_changed();
+        let active_pointer_count = get_active_pointer_count();
+        let last_active_pointer_count = get_last_active_pointer_count();
+        let mut should_draw = false;
+        if pointer_pos_changed || pointer_state_changed || scroll_changed {
+            if active_pointer_count == 1 {
+                let pointer_pos = get_pointer_position(0);
+                let last_pointer_pos = get_last_pointer_position(0);
+
+                if let (true, Some(pointer_pos), Some(last_pointer_pos)) =
+                    (pointer_btn(0, 0), pointer_pos, last_pointer_pos)
+                {
+                    self.pan_update(pointer_pos, last_pointer_pos);
+                    should_draw = true;
+                }
+
+                if let (true, Some(pointer_pos)) = (scroll_changed, pointer_pos) {
+                    let (_, scroll_delta) = get_scroll();
+                    self.scroll_update(pointer_pos, scroll_delta);
+                    should_draw = true;
+                }
+            } else if let (
+                true,
+                Some(primary_pointer_pos),
+                Some(last_primary_pointer_pos),
+                Some(secondary_pointer_pos),
+                Some(last_secondary_pointer_pos),
+            ) = (
+                active_pointer_count > 1,
+                get_pointer_position(0),
+                get_last_pointer_position(0),
+                get_pointer_position(1),
+                get_last_pointer_position(1),
+            ) {
+                self.multitouch_update(
+                    primary_pointer_pos,
+                    last_primary_pointer_pos,
+                    secondary_pointer_pos,
+                    last_secondary_pointer_pos,
+                );
+                should_draw = true;
+            }
+        }
+
+        if should_draw {
             set_target(1);
             self.draw();
         }
-        let mouse_pos = get_mouse_pos();
-        if let Some(Point { x, y }) = mouse_pos {
-            if btn(0) {
-                if btn_this_frame(0) {
+
+        set_target(0);
+        copy_screen(1, 0);
+        if let (true, Some(Point { x, y })) = (active_pointer_count == 1, get_pointer_position(0)) {
+            circ(x, y, 1, 12);
+        }
+    }
+}
+
+const MAX_ITERATION: u32 = 128;
+
+impl Mandlebrot {
+    fn pan_update(
+        &mut self,
+        Point { x, y }: Point,
+        Point {
+            x: last_x,
+            y: last_y,
+        }: Point,
+    ) {
+        let (diff_x, diff_y) = (
+            (last_x - x) as f64 / self.width,
+            (last_y - y) as f64 / self.height,
+        );
+
+        let width = self.clip_rect.r - self.clip_rect.l;
+        let height = self.clip_rect.b - self.clip_rect.t;
+        let mut new_clip_rect = ClipRectFloat {
+            t: self.clip_rect.t + (height * diff_y),
+            b: self.clip_rect.b + (height * diff_y),
+            l: self.clip_rect.l + (width * diff_x),
+            r: self.clip_rect.r + (width * diff_x),
+        };
+        if new_clip_rect.t == new_clip_rect.b || new_clip_rect.l == new_clip_rect.r {
+            return;
+        }
+        if new_clip_rect.t > new_clip_rect.b {
+            let tmp = new_clip_rect.t;
+            new_clip_rect.t = new_clip_rect.b;
+            new_clip_rect.b = tmp;
+        }
+        if new_clip_rect.l > new_clip_rect.r {
+            let tmp = new_clip_rect.l;
+            new_clip_rect.l = new_clip_rect.r;
+            new_clip_rect.r = tmp;
+        }
+        self.clip_rect = new_clip_rect;
+    }
+
+    fn scroll_update(&mut self, Point { x, y }: Point, delta: f64) {
+        let norm_x = x as f64 / self.width;
+        let norm_y = y as f64 / self.height;
+        let clip_width = self.clip_rect.r - self.clip_rect.l;
+        let clip_height = self.clip_rect.b - self.clip_rect.t;
+        let scroll_delta = delta / 100.0;
+        let t_diff = clip_height * norm_y * scroll_delta;
+        let b_diff = clip_height * (norm_y - 1.0).abs() * scroll_delta;
+        let l_diff = clip_width * norm_x * scroll_delta;
+        let r_diff = clip_width * (norm_x - 1.0).abs() * scroll_delta;
+
+        let (l, t, r, b) = rect_swap(
+            self.clip_rect.l + l_diff,
+            self.clip_rect.t + t_diff,
+            self.clip_rect.r - r_diff,
+            self.clip_rect.b - b_diff,
+        );
+        let new_clip_rect = ClipRectFloat {
+            t: t,
+            b: b,
+            l: l,
+            r: r,
+        };
+        self.clip_rect = new_clip_rect;
+    }
+
+    fn multitouch_update(
+        &mut self,
+        Point {
+            x: primary_x,
+            y: primary_y,
+        }: Point,
+        Point {
+            x: last_primary_x,
+            y: last_primary_y,
+        }: Point,
+        Point {
+            x: secondary_x,
+            y: secondary_y,
+        }: Point,
+        Point {
+            x: last_secondary_x,
+            y: last_secondary_y,
+        }: Point,
+    ) {
+        let center_x = (primary_x + secondary_x) / 2;
+        let center_y = (primary_y + secondary_y) / 2;
+        let last_center_x = (last_primary_x + last_secondary_x) / 2;
+        let last_center_y = (last_primary_y + last_secondary_y) / 2;
+        self.pan_update(
+            Point {
+                x: center_x,
+                y: center_y,
+            },
+            Point {
+                x: last_center_x,
+                y: last_center_y,
+            },
+        );
+
+        let length = {
+            let x = (secondary_x - primary_x) as f64 / self.width;
+            let y = (secondary_y - primary_y) as f64 / self.height;
+            ((x * x) + (y * y)).sqrt()
+        };
+
+        let last_length = {
+            let x = (last_secondary_x - last_primary_x) as f64 / self.width;
+            let y = (last_secondary_y - last_primary_y) as f64 / self.height;
+            ((x * x) + (y * y)).sqrt()
+        };
+        let diff_length = (length - last_length) * 2.0;
+        self.scroll_update(
+            Point {
+                x: center_x,
+                y: center_y,
+            },
+            diff_length * 100.0,
+        );
+    }
+    /*
+        fn update_fractal_and_draw(
+            &mut self,
+            pointer_pos: Point,
+            down: bool,
+            this_frame: bool,
+            scroll_delta: f64,
+        ) {
+            let Point { x, y } = pointer_pos;
+            if down {
+                if this_frame {
                     self.first_point = Some(Point { x, y });
                 }
-            } else if !btn(0) && btn_this_frame(0) {
+            } else if !down && this_frame {
                 if let Some(Point {
                     x: first_x,
                     y: first_y,
@@ -137,38 +313,8 @@ impl Sketch for Mandlebrot {
                 self.draw();
             }
         }
-        if btn(2) && btn_this_frame(2) {
-            self.clip_rect = ClipRectFloat {
-                t: 0.0,
-                b: self.height,
-                l: 0.0,
-                r: self.width,
-            };
-            set_target(1);
-            self.draw();
-        }
-        set_target(0);
-        copy_screen(1, 0);
-        if let Some(Point { x, y }) = mouse_pos {
-            if let Some(Point {
-                x: first_x,
-                y: first_y,
-            }) = self.first_point
-            {
-                let i = (x - first_x) as f64 * (self.height / self.width);
-                let y = (first_y as f64) + i;
-                rect(x, (y) as i32, first_x, first_y, 12);
-                // rect(x, y, first_x, first_y, 12);
-            }
-            circ(x, y, 1, 12);
-        }
-    }
-}
 
-const MAX_ITERATION: u32 = 128;
-const BLOCK_SIZE: u32 = MAX_ITERATION / 16;
-
-impl Mandlebrot {
+    */
     fn get_color(&self, px: usize, py: usize) -> u8 {
         let x0 = {
             let x = px as f64;
@@ -229,7 +375,7 @@ pub fn new() -> Box<RefCell<Sketch>> {
 pub static sketch: SketchDescriptor = SketchDescriptor {
     name: "Mandlebrot",
     constructor: &new,
-    mobile: false,
+    mobile: true,
     desktop: true,
     public: true,
     url: "mandlebrot",

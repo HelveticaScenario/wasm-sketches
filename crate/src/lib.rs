@@ -13,6 +13,7 @@ use std::cmp;
 use std::rc::Rc;
 use wasm_bindgen::prelude::wasm_bindgen as bindgen;
 use wasm_bindgen::prelude::JsValue;
+use web_sys::console::log_1;
 // use wasm_bindgen::wasm_bindgen_macro::wasm_bindgen as bindgen:
 
 // unsafe impl Sync for SketchContainer<T> {}
@@ -38,7 +39,9 @@ pub fn init(index: usize) {
         (state.transparency).fill(false);
         state.transparency[0] = true;
         state.time = 0.0;
-        state.mouse_pos = None;
+        for i in 0..state.pointer_pos.len() {
+            state.pointer_pos[i] = None;
+        }
         state.offset.x = 0;
         state.offset.y = 0;
     }
@@ -81,6 +84,16 @@ pub fn update(delta: f32) {
             MouseButtonState::Down => MouseButtonState::Down,
         };
     }
+    {
+        let mut state = STATE.0.borrow_mut();
+        for i in 0..POINTER_COUNT {
+            state.last_pointer_pos[i] = state.pointer_pos[i];
+            state.last_pointer_state[i] = state.pointer_state[i];
+        }
+        state.pointer_pos_changed = false;
+        state.pointer_state_changed = false;
+    }
+
     {
         let mut state = STATE.0.borrow_mut();
         state.scroll_delta = 0.0;
@@ -136,15 +149,30 @@ pub fn update(delta: f32) {
 }
 
 #[bindgen]
-pub fn set_mouse_pos(x: i32, y: i32) {
+pub fn set_pointer_pos(idx: usize, x: i32, y: i32) {
     let mut state = STATE.0.borrow_mut();
-    (*state).mouse_pos = Some(Point { x: x, y: y });
+    if idx < (*state).pointer_pos.len() {
+        (*state).pointer_pos[idx] = Some(Point { x: x, y: y });
+        state.pointer_pos_changed = true;
+    }
 }
 
 #[bindgen]
-pub fn set_mouse_end() {
+pub fn set_pointer_end(idx: usize) {
     let mut state = STATE.0.borrow_mut();
-    (*state).mouse_pos = None;
+    if idx < (*state).pointer_pos.len() {
+        (*state).pointer_pos[idx] = None;
+        state.pointer_pos_changed = true;
+    }
+}
+
+#[bindgen]
+pub fn set_pointer_state(idx: usize, btns: u32) {
+    let mut state = STATE.0.borrow_mut();
+    if idx < (*state).pointer_state.len() {
+        (*state).pointer_state[idx] = btns;
+        state.pointer_state_changed = true;
+    }
 }
 
 #[bindgen]

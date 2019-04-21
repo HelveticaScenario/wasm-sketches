@@ -58,6 +58,6 @@ export default class Sketch extends React.Component<SketchProps, {}> {
 	}
 
 	render() {
-		return <canvas ref={this.canvasRef} />
+		return <canvas touch-action="none" ref={this.canvasRef} />
 	}
 }

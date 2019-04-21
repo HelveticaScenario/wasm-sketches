@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::cmp;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+use web_sys::console::log_1;
 
 pub trait FillExt<T> {
     fn fill(&mut self, v: T);
@@ -43,11 +44,13 @@ pub const DEFAULT_COLORS: [u8; 16 * 3] = [
     168, 255, 204, 170,
 ];
 
+#[derive(Copy, Clone, Debug)]
 pub struct Point {
     pub x: i32,
     pub y: i32,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct ClipRect {
     pub l: i32,
     pub t: i32,
@@ -55,7 +58,7 @@ pub struct ClipRect {
     pub b: i32,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum MouseButtonState {
     UpThisFrame,
     Up,
@@ -63,10 +66,11 @@ pub enum MouseButtonState {
     Down,
 }
 
+pub const POINTER_COUNT: usize = 10;
+
 pub struct State {
     pub time: f32,
     pub offset: Point,
-    pub mouse_pos: Option<Point>,
     pub dimensions: (usize, usize),
     pub target: u8,
     pub sides_buffer_left: [i32; MAX_HEIGHT],
@@ -76,7 +80,26 @@ pub struct State {
     pub mouse_buttons: [MouseButtonState; 5],
     pub scroll: f64,
     pub scroll_delta: f64,
+    pub pointer_pos: [Option<Point>; POINTER_COUNT],
+    pub last_pointer_pos: [Option<Point>; POINTER_COUNT],
+    pub pointer_state: [u32; POINTER_COUNT],
+    pub last_pointer_state: [u32; POINTER_COUNT],
+    pub pointer_pos_changed: bool,
+    pub pointer_state_changed: bool,
 }
+
+/*
+Device Button State	                                                    button	buttons
+Mouse move with no buttons pressed	                                        -1	0
+Left Mouse, Touch Contact, Pen contact (with no modifier buttons pressed)	0	1
+Middle Mouse	                                                            1	4
+Right Mouse, Pen contact with barrel button pressed	                        2	2
+X1 (back) Mouse	                                                            3	8
+X2 (forward) Mouse	                                                        4	16
+Pen contact with eraser button pressed	                                    5	32
+*/
+
+const BUTTON_VALUES: [u32; 6] = [1, 2, 4, 8, 16, 32];
 
 pub struct Container(pub RefCell<State>);
 unsafe impl Sync for Container {}
@@ -93,7 +116,6 @@ unsafe impl Sync for PaletteSwap {}
 pub static STATE: Container = Container(RefCell::new(State {
     time: 0.0,
     offset: Point { x: 0, y: 0 },
-    mouse_pos: None,
     dimensions: (128, 128),
     target: 0,
     sides_buffer_left: [0; MAX_HEIGHT],
@@ -108,6 +130,12 @@ pub static STATE: Container = Container(RefCell::new(State {
     mouse_buttons: [MouseButtonState::Up; 5],
     scroll: 0.0,
     scroll_delta: 0.0,
+    pointer_pos: [None; 10],
+    last_pointer_pos: [None; 10],
+    pointer_state: [0; 10],
+    last_pointer_state: [0; 10],
+    pointer_pos_changed: false,
+    pointer_state_changed: false,
 }));
 
 pub static SCREEN: Screen = Screen(RefCell::new([0; MAX_SCREEN_SIZE]));
@@ -240,22 +268,53 @@ pub fn limit_point(x: i32, y: i32) -> (i32, i32) {
 
 pub fn get_mouse_pos() -> Option<Point> {
     let state = STATE.0.borrow();
-    if let Some(Point { x, y }) = state.mouse_pos {
+    if let Some(Point { x, y }) = state.pointer_pos[0] {
         Some(Point { x, y })
     } else {
         None
     }
 }
 
+pub fn get_pointer_position(pointer: usize) -> Option<Point> {
+    STATE.0.borrow().pointer_pos[pointer]
+}
+pub fn get_last_pointer_position(pointer: usize) -> Option<Point> {
+    STATE.0.borrow().last_pointer_pos[pointer]
+}
+
+pub fn has_any_pointer_position_changed() -> bool {
+    STATE.0.borrow().pointer_pos_changed
+}
+pub fn has_any_pointer_state_changed() -> bool {
+    STATE.0.borrow().pointer_state_changed
+}
+
 pub fn get_scroll() -> (f64, f64) {
     let state = STATE.0.borrow();
     (state.scroll, state.scroll_delta)
 }
+pub fn has_scroll_changed() -> bool {
+    STATE.0.borrow().scroll_delta != 0.0
+}
 
 pub fn get_mouse_btn(btn: u8) -> MouseButtonState {
+    get_pointer_btn(0, btn)
+}
+pub fn get_pointer_btn(pointer: u8, btn: u8) -> MouseButtonState {
     let state = STATE.0.borrow();
-    if (btn as usize) < state.mouse_buttons.len() {
-        state.mouse_buttons[btn as usize]
+
+    if (pointer as usize) < state.pointer_state.len() && (btn as usize) < BUTTON_VALUES.len() {
+        let down_this_frame =
+            (state.pointer_state[pointer as usize] & BUTTON_VALUES[btn as usize]) > 0;
+        let down_last_frame =
+            (state.last_pointer_state[pointer as usize] & BUTTON_VALUES[btn as usize]) > 0;
+
+        match (down_this_frame, down_last_frame) {
+            (true, true) => MouseButtonState::Down,
+            (true, false) => MouseButtonState::DownThisFrame,
+            (false, false) => MouseButtonState::Up,
+            (false, true) => MouseButtonState::UpThisFrame,
+        }
     } else {
         MouseButtonState::Up
     }
@@ -277,6 +336,56 @@ pub fn btn_this_frame(btn_num: u8) -> bool {
         MouseButtonState::Down => false,
         MouseButtonState::DownThisFrame => true,
     }
+}
+
+pub fn pointer_btn(pointer: u8, btn_num: u8) -> bool {
+    match get_pointer_btn(pointer, btn_num) {
+        MouseButtonState::Up => false,
+        MouseButtonState::UpThisFrame => false,
+        MouseButtonState::Down => true,
+        MouseButtonState::DownThisFrame => true,
+    }
+}
+
+pub fn pointer_btn_this_frame(pointer: u8, btn_num: u8) -> bool {
+    match get_pointer_btn(pointer, btn_num) {
+        MouseButtonState::Up => false,
+        MouseButtonState::UpThisFrame => true,
+        MouseButtonState::Down => false,
+        MouseButtonState::DownThisFrame => true,
+    }
+}
+
+pub fn get_active_pointer_count() -> usize {
+    STATE
+        .0
+        .borrow()
+        .pointer_pos
+        .iter()
+        .filter(|x| {
+            if let Some(Point { x: _x, y: _y }) = x {
+                true
+            } else {
+                false
+            }
+        })
+        .count()
+}
+
+pub fn get_last_active_pointer_count() -> usize {
+    STATE
+        .0
+        .borrow()
+        .last_pointer_pos
+        .iter()
+        .filter(|x| {
+            if let Some(Point { x: _x, y: _y }) = x {
+                true
+            } else {
+                false
+            }
+        })
+        .count()
 }
 
 pub fn set_clip(x: i32, y: i32, w: i32, h: i32) {

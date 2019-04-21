@@ -25,6 +25,7 @@
 		"webpack-dev-server": "^3.2.1"
 	},
 	"dependencies": {
+		"pepjs": "^0.5.2",
 		"react": "^16.8.6",
 		"react-dom": "^16.8.6",
 		"react-router-dom": "^5.0.0"

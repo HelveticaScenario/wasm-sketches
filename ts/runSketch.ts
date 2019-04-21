@@ -54,10 +54,7 @@ export default (
 ) => {
 	const memory: WebAssembly.Memory = module.get_memory()
 	const { index } = sketch
-	console.log('init')
-
-	console.log(index)
-	console.log(module.init(index))
+	module.init(index)
 
 	const screenSize = module.screen_size()
 	const paletteSize = module.palette_size()
@@ -88,6 +85,14 @@ export default (
 		canvas.width = viewportWidth
 	}
 
+	function getPointerPos(evt: PointerEvent) {
+		var rect = canvas.getBoundingClientRect()
+		return {
+			x: Math.floor((evt.clientX - rect.left) / dim),
+			y: Math.floor((evt.clientY - rect.top) / dim),
+		}
+	}
+
 	function getMousePos(evt: MouseEvent) {
 		var rect = canvas.getBoundingClientRect()
 		return {
@@ -96,11 +101,11 @@ export default (
 		}
 	}
 
-	function getTouchPos(evt: TouchEvent) {
+	function getTouchPos(touch: Touch) {
 		var rect = canvas.getBoundingClientRect()
 		return {
-			x: Math.floor((evt.touches[0].clientX - rect.left) / dim),
-			y: Math.floor((evt.touches[0].clientY - rect.top) / dim),
+			x: Math.floor((touch.clientX - rect.left) / dim),
+			y: Math.floor((touch.clientY - rect.top) / dim),
 		}
 	}
 
@@ -113,63 +118,61 @@ export default (
 	window.addEventListener('resize', resize)
 	resize()
 
-	canvas.addEventListener('mouseleave', e => {
-		module.set_mouse_end()
-	})
-	canvas.addEventListener('mousemove', e => {
-		const { x, y } = getMousePos(e)
-		module.set_mouse_pos(x, y)
-	})
-	canvas.addEventListener('mouseenter', e => {
-		const { x, y } = getMousePos(e)
-		module.set_mouse_pos(x, y)
-	})
-
-	canvas.addEventListener('mousedown', e => {
-		e.preventDefault()
-		e.stopPropagation()
-		const btn = e.button
-		module.set_mouse_button(btn, true)
-		const onUp = (e: MouseEvent) => {
-			if (e.button === btn) {
-				module.set_mouse_button(btn, false)
-				window.removeEventListener('mouseup', onUp)
-			}
-		}
-		window.addEventListener('mouseup', onUp)
-	})
-
 	canvas.addEventListener('wheel', e => {
 		e.preventDefault()
 		e.stopPropagation()
-		module.set_wheel(e.deltaY)
-		// const btn = e.button
-		// module.set_mouse_button(btn, true)
-		// const onUp = (e: MouseEvent) => {
-		// 	if (e.button === btn) {
-		// 		module.set_mouse_button(btn, false)
-		// 		window.removeEventListener('mouseup', onUp)
-		// 	}
-		// }
-		// window.addEventListener('mouseup', onUp)
+		let delta = e.deltaY
+		if (e.ctrlKey) {
+			delta *= -1
+		}
+		module.set_wheel(delta)
 	})
 
-	canvas.addEventListener('touchend', e => {
-		e.preventDefault()
-		e.stopImmediatePropagation()
-		module.set_mouse_end()
+	const touchState = Array(10)
+	touchState.fill(null)
+
+	canvas.addEventListener('pointerenter', e => {
+		const { pointerId } = e
+		const index = touchState.indexOf(null)
+		if (index >= 0) {
+			touchState[index] = pointerId
+			const { x, y } = getPointerPos(e)
+			module.set_pointer_pos(index, x, y)
+		}
 	})
-	canvas.addEventListener('touchstart', e => {
-		e.preventDefault()
-		e.stopImmediatePropagation()
-		const { x, y } = getTouchPos(e)
-		module.set_mouse_pos(x, y)
+
+	canvas.addEventListener('pointerout', e => {
+		const { pointerId } = e
+		const index = touchState.indexOf(pointerId)
+		if (index >= 0) {
+			touchState[index] = null
+			module.set_pointer_end(index)
+		}
 	})
-	canvas.addEventListener('touchmove', e => {
-		e.preventDefault()
-		e.stopImmediatePropagation()
-		const { x, y } = getTouchPos(e)
-		module.set_mouse_pos(x, y)
+
+	canvas.addEventListener('pointerdown', e => {
+		const { pointerId } = e
+		const index = touchState.indexOf(pointerId)
+		if (index >= 0) {
+			module.set_pointer_state(index, e.buttons)
+		}
+	})
+
+	canvas.addEventListener('pointerup', e => {
+		const { pointerId } = e
+		const index = touchState.indexOf(pointerId)
+		if (index >= 0) {
+			module.set_pointer_state(index, e.buttons)
+		}
+	})
+
+	canvas.addEventListener('pointermove', e => {
+		const { pointerId } = e
+		const index = touchState.indexOf(pointerId)
+		if (index >= 0) {
+			const { x, y } = getPointerPos(e)
+			module.set_pointer_pos(index, x, y)
+		}
 	})
 
 	const vertShaderSource = `
