@@ -1,5 +1,6 @@
 extern crate rand;
 extern crate web_sys;
+mod font;
 mod pico;
 mod sketch;
 mod sketches;

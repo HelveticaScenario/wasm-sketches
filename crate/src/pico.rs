@@ -1,3 +1,4 @@
+use crate::font::*;
 use rand::prelude::*;
 use std::cell::RefCell;
 use std::cmp;
@@ -823,4 +824,63 @@ pub fn copy_sprite_with_transparency(
             }
         }
     }
+}
+
+// pub fn get_bit() {
+//     let idx = (addr / 8) as u8;
+//     let bit = (addr % 8) as u8;
+//     return (bool)((arr[idx] >> bit) & 1);
+// }
+
+pub fn prnt(string: String, x: i32, y: i32, c: i32) {
+    let mut _x = x;
+    let mut _y = y;
+    for character in string.chars() {
+        if character.is_ascii() {
+            let character = character as usize;
+            if character > 32 && character < 128 {
+                for i in 0..8 {
+                    let line = BIT_FONT[(((character - 33) * 8) + i) as usize];
+                    for j in 0..8 {
+                        if ((line >> j) & 1) == 1 {
+                            pset(_x + j, _y + i as i32, c);
+                        }
+                    }
+                }
+                _x += 8;
+            } else if character == 13 {
+                // carriage return, do nothing
+            } else if character == 10 {
+                _x = x;
+                _y += 9;
+            } else {
+                _x += 8;
+            }
+        }
+    }
+    // for ( std::string::iterator it=str.begin(); it!=str.end(); ++it) {
+    //     uint8_t character = (uint8_t) *it;
+    //     if (character > 32 && character < 128) {
+    //         for (int16_t i = 0; i < 8; i++) {
+    //             uint8_t line = *(font_data.begin + ((character - 33)*8) + i);
+    //             for (int16_t j =0; j < 8; j++) {
+    //                 if (rose_get_bit(&line, (uint8_t) j)) {
+    //                     pset(_x + j, _y + i, c);
+    //                 }
+    //             }
+    //         }
+    //         _x += 8;
+    //     } else if (character == 13) {
+    //         // carriage return, do nothing
+    //     } else if (character == 10) {
+    //         _x = x;
+    //         _y += 9;
+    //     } else {
+    //         _x += 8;
+    //     }
+    // }
+    // int16_t* ptr = (int16_t*) print_cursor.begin;
+    // ptr[0] = _x;
+    // ptr[1] = _y;
+    // return ROSE_API_ERR_NONE;
 }
