@@ -4,8 +4,10 @@
 		<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
 		<meta
 			name="viewport"
-			content="initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no"
+			content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
 		/>
+
+		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<title>The personal website of Daniel Lewis</title>
 		<link
 			rel="stylesheet"
@@ -14,11 +16,16 @@
 		<style>
 			body,
 			#app {
-				width: 100vw;
-				height: 100vh;
 				display: flex;
 				justify-content: center;
 				align-items: center;
+				bottom: 0;
+				top: 0;
+				left: 0;
+				right: 0;
+			}
+			body {
+				position: fixed;
 			}
 			canvas {
 				image-rendering: -moz-crisp-edges;
@@ -26,6 +33,39 @@
 				image-rendering: pixelated;
 				image-rendering: crisp-edges;
 				cursor: none;
+			}
+			::-webkit-scrollbar {
+				width: 6px;
+				height: 6px;
+			}
+			::-webkit-scrollbar-button {
+				width: 0px;
+				height: 0px;
+			}
+			::-webkit-scrollbar-thumb {
+				background: #2a65b0;
+				border: 0px none #2a65b0;
+				border-radius: 50px;
+			}
+			::-webkit-scrollbar-thumb:hover {
+				background: #4c88e8;
+			}
+			::-webkit-scrollbar-thumb:active {
+				background: #4a7ccc;
+			}
+			::-webkit-scrollbar-track {
+				background: #132a54;
+				border: 0px none #132a54;
+				border-radius: 0px;
+			}
+			::-webkit-scrollbar-track:hover {
+				background: #132a54;
+			}
+			::-webkit-scrollbar-track:active {
+				background: #060f1d;
+			}
+			::-webkit-scrollbar-corner {
+				background: transparent;
 			}
 		</style>
 	</head>
