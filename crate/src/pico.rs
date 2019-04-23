@@ -832,7 +832,7 @@ pub fn copy_sprite_with_transparency(
 //     return (bool)((arr[idx] >> bit) & 1);
 // }
 
-pub fn prnt(string: String, x: i32, y: i32, c: i32) {
+pub fn prnt(string: &str, x: i32, y: i32, c: i32) {
     let mut _x = x;
     let mut _y = y;
     for character in string.chars() {
