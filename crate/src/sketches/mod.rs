@@ -8,6 +8,7 @@ pub mod mandlebrot;
 pub mod rand_static;
 pub mod rects;
 pub mod text;
+pub mod face;
 use crate::sketch::*;
 
 pub static SKETCHES: &[&SketchDescriptor] = &[
@@ -21,4 +22,5 @@ pub static SKETCHES: &[&SketchDescriptor] = &[
     &erase2::sketch,
     &mandlebrot::sketch,
     &text::sketch,
+    &face::sketch
 ];

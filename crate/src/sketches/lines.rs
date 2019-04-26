@@ -8,7 +8,7 @@ pub struct Lines {}
 
 impl Sketch for Lines {
     fn new() -> Lines {
-        set_dimensions(2048, 2048);
+        set_dimensions(1024, 1024);
         cls(0);
         Lines {}
     }

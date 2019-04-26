@@ -215,7 +215,7 @@ pub fn screen_size() -> usize {
 
 #[bindgen]
 pub fn palette_size() -> usize {
-    NUM_COLORS * 4
+    NUM_COLORS * 3
 }
 
 #[bindgen]

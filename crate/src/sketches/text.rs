@@ -42,16 +42,16 @@ pub struct Text {
 
 impl Sketch for Text {
     fn new() -> Text {
-        set_dimensions(240*2, 136*2);
+        set_dimensions(240 * 2, 136 * 2);
         cls(0);
-        let owned = string.to_owned();
-        let offset = Point { x: 2, y: 2 };
-        for y in -1..2 {
-            for x in -1..2 {
-                prnt(&owned, offset.x + x, offset.y + y, y + x + 3);
-            }
-        }
-        prnt(&owned, offset.x, offset.y, 7);
+        // let owned = string.to_owned();
+        // let offset = Point { x: 2, y: 2 };
+        // for y in -1..2 {
+        //     for x in -1..2 {
+        //         prnt(&owned, offset.x + x, offset.y + y, y + x + 3);
+        //     }
+        // }
+        // prnt(&owned, offset.x, offset.y, 7);
 
         Text { count: 0 }
     }
@@ -59,20 +59,33 @@ impl Sketch for Text {
         // cls(0);
         self.count += 1;
         self.count %= 64;
-        if self.count % 4 == 0 {
-            // cls(0);
+        if self.count % 16 == 0 {
+            cls(0);
             let offset = Point { x: 2, y: 2 };
-            for y in -1..2 {
-                for x in -1..2 {
-                    prnt(
-                        &string,
-                        offset.x + x,
-                        offset.y + y,
-                        (y + x + 3 + (self.count / 4)) % 16,
-                    );
-                }
-            }
-            prnt(&string, offset.x, offset.y, 0);
+            prnt(
+                &string,
+                offset.x - 1,
+                if (self.count % 32) == 0 {
+                    offset.y
+                } else {
+                    offset.y - 1
+                },
+                3,
+                if (self.count % 32) == 0 { 3 } else { 4 },
+                7,
+            );
+            prnt(
+                &string,
+                offset.x,
+                if (self.count % 32) == 0 {
+                    offset.y + 1
+                } else {
+                    offset.y
+                },
+                1,
+                1,
+                0,
+            );
         }
     }
 }

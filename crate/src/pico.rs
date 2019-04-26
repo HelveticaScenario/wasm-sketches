@@ -34,8 +34,8 @@ impl FillExt<bool> for [bool] {
     }
 }
 
-pub const MAX_WIDTH: usize = 2048;
-pub const MAX_HEIGHT: usize = 2048;
+pub const MAX_WIDTH: usize = 1024;
+pub const MAX_HEIGHT: usize = 1024;
 
 pub const MAX_SCREEN_SIZE: usize = MAX_WIDTH * MAX_HEIGHT;
 pub const NUM_COLORS: usize = 256;
@@ -826,13 +826,36 @@ pub fn copy_sprite_with_transparency(
     }
 }
 
+fn as_u16_le(array: &[u8; 2]) -> u16 {
+    ((array[0] as u16) << 0) + ((array[1] as u16) << 8)
+}
+
+pub fn load_spritesheet(bytes: &[u8]) {
+    let width = as_u16_le(&[bytes[0], bytes[1]]) as usize;
+    let height = as_u16_le(&[bytes[2], bytes[3]]) as usize;
+    {
+        PALETTE
+            .0
+            .borrow_mut()
+            .clone_from_slice(&bytes[4..(NUM_COLORS * 3 + 4)]);
+    };
+
+    let offset = NUM_COLORS * 3 + 4;
+    let mut buf = BUFFER3.0.borrow_mut();
+    let (buf_width, buf_height) = (WIDTH(), HEIGHT());
+    for i in 0..height {
+        buf[(buf_width * i)..(buf_width * i + width)]
+            .copy_from_slice(&bytes[(offset + (width * i))..(offset + (width * (i + 1)))]);
+    }
+}
+
 // pub fn get_bit() {
 //     let idx = (addr / 8) as u8;
 //     let bit = (addr % 8) as u8;
 //     return (bool)((arr[idx] >> bit) & 1);
 // }
 
-pub fn prnt(string: &str, x: i32, y: i32, c: i32) {
+pub fn prnt(string: &str, x: i32, y: i32, w: i32, h: i32, c: i32) {
     let mut _x = x;
     let mut _y = y;
     for character in string.chars() {
@@ -843,7 +866,13 @@ pub fn prnt(string: &str, x: i32, y: i32, c: i32) {
                     let line = BIT_FONT[(((character - 33) * 8) + i) as usize];
                     for j in 0..8 {
                         if ((line >> j) & 1) == 1 {
-                            pset(_x + j, _y + i as i32, c);
+                            rect_fill(
+                                _x + j,
+                                _y + i as i32,
+                                w - 1 + _x + j,
+                                h - 1 + _y + i as i32,
+                                c,
+                            );
                         }
                     }
                 }
