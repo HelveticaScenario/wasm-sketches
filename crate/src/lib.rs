@@ -1,5 +1,8 @@
+// #![allow(dead_code)]
 extern crate rand;
 extern crate web_sys;
+extern crate ncollide2d;
+extern crate nalgebra;
 mod font;
 mod pico;
 mod sketch;
