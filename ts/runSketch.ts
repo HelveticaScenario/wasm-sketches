@@ -1,6 +1,27 @@
 import { uw } from './utils'
 import { SketchDescription, WasmModule } from './wasmContext'
 
+function makeGetScreen() {
+	let cachedScreen: Uint8Array
+	let cachedBuffer: ArrayBuffer
+	let cachedPointer: number
+	let cachedSize: number
+	return (buffer: ArrayBuffer, pointer: number, size: number) => {
+		if (
+			buffer !== cachedBuffer ||
+			pointer !== cachedPointer ||
+			size !== cachedSize
+		) {
+			cachedBuffer = buffer
+			cachedPointer = pointer
+			cachedSize = size
+			console.log('initialized screen view')
+			cachedScreen = new Uint8Array(buffer, pointer, size)
+		}
+		return cachedScreen
+	}
+}
+
 function getQueryVariable(variable: string) {
 	var query = window.location.search.substring(1)
 	var vars = query.split('&')
@@ -55,6 +76,7 @@ export default (
 	const memory: WebAssembly.Memory = module.get_memory()
 	const { index } = sketch
 	module.init(index)
+	const getScreen = makeGetScreen()
 
 	const screenSize = module.screen_size()
 	const paletteSize = module.palette_size()
@@ -272,7 +294,7 @@ export default (
 			0,
 			gl.LUMINANCE,
 			gl.UNSIGNED_BYTE,
-			screen
+			getScreen(memory.buffer, module.screen_ptr(), screenSize)
 		)
 		gl.bindTexture(gl.TEXTURE_2D, swapTexture)
 		gl.texImage2D(
@@ -379,7 +401,5 @@ export default (
 		gl.uniform1i(paletteUniform, 2)
 
 		gl.drawArrays(gl.TRIANGLES, 0, 6)
-
-		// console.log(screen[0])
 	}
 }
