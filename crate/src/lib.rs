@@ -3,6 +3,7 @@ extern crate rand;
 extern crate web_sys;
 extern crate ncollide2d;
 extern crate nalgebra;
+extern crate euclid;
 mod font;
 mod pico;
 mod sketch;

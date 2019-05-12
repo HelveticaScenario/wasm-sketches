@@ -1,21 +1,9 @@
 use crate::font::*;
-use nalgebra::{Point2, Vector2};
+use euclid::{Point2D, Vector2D};
 use std::cell::RefCell;
 use std::cmp;
 use wasm_bindgen::prelude::*;
 use web_sys::console::log_1;
-
-pub trait PointConvert {
-    fn to_i32(&self) -> Point2<i32>;
-}
-
-impl PointConvert for Point2<f64> {
-    fn to_i32(&self) -> Point2<i32> {
-        let x = self.x.round() as i32;
-        let y = self.y.round() as i32;
-        Point2::new(x, y)
-    }
-}
 
 pub trait FillExt<T> {
     fn fill(&mut self, v: T);
@@ -431,7 +419,7 @@ pub fn pset(x: i32, y: i32, c: i32) {
     }
 }
 
-pub fn pset_nalgebra(v: &Point2<f64>, c: i32) {
+pub fn pset_euclid(v: &Point2D<f64>, c: i32) {
     pset(v.x.round() as i32, v.y.round() as i32, c);
 }
 
@@ -445,7 +433,7 @@ pub fn pget(x: i32, y: i32) -> Option<u8> {
     }
 }
 
-pub fn pget_nalgebra(v: &Point2<f64>) -> Option<u8> {
+pub fn pget_euclid(v: &Point2D<f64>) -> Option<u8> {
     pget(v.x.round() as i32, v.y.round() as i32)
 }
 
@@ -504,7 +492,7 @@ pub fn line(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
     line_with_pixel_func(x0, y0, x1, y1, c, &pset);
 }
 
-pub fn line_nalgebra(v0: &Point2<f64>, v1: &Point2<f64>, c: i32) {
+pub fn line_euclid(v0: &Point2D<f64>, v1: &Point2D<f64>, c: i32) {
     line(
         v0.x.round() as i32,
         v0.y.round() as i32,
@@ -551,16 +539,16 @@ pub fn fat_line(x0: i32, y0: i32, x1: i32, y1: i32, half_width: i32, caps: bool,
     }
 }
 
-pub fn fat_line_nalgebra(v0: &Point2<f64>, v1: &Point2<f64>, half_width: f64, caps: bool, c: i32) {
-    fat_line(
-        v0.x.round() as i32,
-        v0.y.round() as i32,
-        v1.x.round() as i32,
-        v1.y.round() as i32,
-        half_width.round() as i32,
-        caps,
-        c,
-    );
+pub fn fat_line_euclid(
+    v0: &Point2D<f64>,
+    v1: &Point2D<f64>,
+    half_width: f64,
+    caps: bool,
+    c: i32,
+) {
+    let v0 = v0.to_i32();
+    let v1 = v1.to_i32();
+    fat_line(v0.x, v0.y, v1.x, v1.y, half_width.round() as i32, caps, c);
 }
 
 pub fn rect(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
@@ -603,14 +591,10 @@ pub fn rect(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
     }
 }
 
-pub fn rect_nalgebra(top_left: &Point2<f64>, bottom_right: &Point2<f64>, c: i32) {
-    rect_fill(
-        top_left.x.round() as i32,
-        top_left.y.round() as i32,
-        bottom_right.x.round() as i32,
-        bottom_right.y.round() as i32,
-        c,
-    );
+pub fn rect_euclid(top_left: &Point2D<f64>, bottom_right: &Point2D<f64>, c: i32) {
+    let top_left = top_left.to_i32();
+    let bottom_right = bottom_right.to_i32();
+    rect(top_left.x, top_left.y, bottom_right.x, bottom_right.y, c);
 }
 
 pub fn rect_fill(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
@@ -630,14 +614,10 @@ pub fn rect_fill(x0: i32, y0: i32, x1: i32, y1: i32, c: i32) {
         }
     }
 }
-pub fn rect_fill_nalgebra(top_left: &Point2<f64>, bottom_right: &Point2<f64>, c: i32) {
-    rect_fill(
-        top_left.x.round() as i32,
-        top_left.y.round() as i32,
-        bottom_right.x.round() as i32,
-        bottom_right.y.round() as i32,
-        c,
-    );
+pub fn rect_fill_euclid(top_left: &Point2D<f64>, bottom_right: &Point2D<f64>, c: i32) {
+    let top_left = top_left.to_i32();
+    let bottom_right = bottom_right.to_i32();
+    rect_fill(top_left.x, top_left.y, bottom_right.x, bottom_right.y, c);
 }
 
 pub fn circ_with_pixel_func(xm: i32, ym: i32, radius: i32, c: i32, func: &Fn(i32, i32, i32)) {
@@ -668,27 +648,22 @@ pub fn circ_with_pixel_func(xm: i32, ym: i32, radius: i32, c: i32, func: &Fn(i32
         }
     }
 }
-pub fn circ_with_pixel_func_nalgebra(
-    center: &Point2<f64>,
+pub fn circ_with_pixel_func_euclid(
+    center: &Point2D<f64>,
     radius: f64,
     c: i32,
     func: &Fn(i32, i32, i32),
 ) {
-    circ_with_pixel_func(
-        center.x.round() as i32,
-        center.y.round() as i32,
-        radius.round() as i32,
-        c,
-        func,
-    );
+    let center = center.to_i32();
+    circ_with_pixel_func(center.x, center.y, radius.round() as i32, c, func);
 }
 
 pub fn circ(x: i32, y: i32, r: i32, c: i32) {
     circ_with_pixel_func(x, y, r, c, &pset);
 }
 
-pub fn circ_nalgebra(center: &Point2<f64>, r: f64, c: i32) {
-    circ_with_pixel_func_nalgebra(center, r, c, &pset);
+pub fn circ_euclid(center: &Point2D<f64>, r: f64, c: i32) {
+    circ_with_pixel_func_euclid(center, r, c, &pset);
 }
 
 pub fn circ_fill(x: i32, y: i32, r: i32, c: i32) {
@@ -717,13 +692,9 @@ pub fn circ_fill(x: i32, y: i32, r: i32, c: i32) {
     }
 }
 
-pub fn circ_fill_nalgebra(center: &Point2<f64>, r: f64, c: i32) {
-    circ_fill(
-        center.x.round() as i32,
-        center.y.round() as i32,
-        r.round() as i32,
-        c,
-    );
+pub fn circ_fill_euclid(center: &Point2D<f64>, r: f64, c: i32) {
+    let center = center.to_i32();
+    circ_fill(center.x, center.y, r.round() as i32, c);
 }
 
 pub fn tri(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
@@ -732,16 +703,11 @@ pub fn tri(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
     line(x2, y2, x0, y0, c);
 }
 
-pub fn tri_nalgebra(v0: &Point2<f64>, v1: &Point2<f64>, v2: &Point2<f64>, c: i32) {
-    tri(
-        v0.x.round() as i32,
-        v0.y.round() as i32,
-        v1.x.round() as i32,
-        v1.y.round() as i32,
-        v2.x.round() as i32,
-        v2.y.round() as i32,
-        c,
-    );
+pub fn tri_euclid(v0: &Point2D<f64>, v1: &Point2D<f64>, v2: &Point2D<f64>, c: i32) {
+    let v0 = v0.to_i32();
+    let v1 = v1.to_i32();
+    let v2 = v2.to_i32();
+    tri(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y, c);
 }
 
 pub fn tri_fill(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
@@ -763,16 +729,11 @@ pub fn tri_fill(x0: i32, y0: i32, x1: i32, y1: i32, x2: i32, y2: i32, c: i32) {
     }
 }
 
-pub fn tri_fill_nalgebra(v0: &Point2<f64>, v1: &Point2<f64>, v2: &Point2<f64>, c: i32) {
-    tri_fill(
-        v0.x.round() as i32,
-        v0.y.round() as i32,
-        v1.x.round() as i32,
-        v1.y.round() as i32,
-        v2.x.round() as i32,
-        v2.y.round() as i32,
-        c,
-    );
+pub fn tri_fill_euclid(v0: &Point2D<f64>, v1: &Point2D<f64>, v2: &Point2D<f64>, c: i32) {
+    let v0 = v0.to_i32();
+    let v1 = v1.to_i32();
+    let v2 = v2.to_i32();
+    tri_fill(v0.x, v0.y, v1.x, v1.y, v2.x, v2.y, c);
 }
 
 pub fn hline(x0: usize, x1: usize, y: usize, c: u8) {
@@ -1025,54 +986,54 @@ pub fn prnt(string: &str, x: i32, y: i32, w: i32, h: i32, c: i32) {
     // return ROSE_API_ERR_NONE;
 }
 
-pub fn tri_fill_fan(verts: &[Point2<f64>], c: i32) {
+pub fn tri_fill_fan(verts: &[Point2D<f64>], c: i32) {
     match verts.len() {
         0 => (),
-        1 => pset_nalgebra(&verts[0], c),
-        2 => line_nalgebra(&verts[0], &verts[1], c),
+        1 => pset_euclid(&verts[0], c),
+        2 => line_euclid(&verts[0], &verts[1], c),
         len => {
             for i in 2..len {
-                tri_fill_nalgebra(&verts[0], &verts[i - 1], &verts[i], c);
+                tri_fill_euclid(&verts[0], &verts[i - 1], &verts[i], c);
             }
         }
     };
 }
 
-pub fn tri_fan(verts: &[Point2<f64>], c: i32) {
+pub fn tri_fan(verts: &[Point2D<f64>], c: i32) {
     match verts.len() {
         0 => (),
-        1 => pset_nalgebra(&verts[0], c),
-        2 => line_nalgebra(&verts[0], &verts[1], c),
+        1 => pset_euclid(&verts[0], c),
+        2 => line_euclid(&verts[0], &verts[1], c),
         len => {
             for i in 2..len {
-                tri_nalgebra(&verts[0], &verts[i - 1], &verts[i], c);
+                tri_euclid(&verts[0], &verts[i - 1], &verts[i], c);
             }
         }
     };
 }
 
-pub fn poly_line(verts: &[Point2<f64>], c: i32, closed: bool) {
+pub fn poly_line(verts: &[Point2D<f64>], c: i32, closed: bool) {
     match verts.len() {
         0 => (),
-        1 => pset_nalgebra(&verts[0], c),
-        2 => line_nalgebra(&verts[0], &verts[1], c),
+        1 => pset_euclid(&verts[0], c),
+        2 => line_euclid(&verts[0], &verts[1], c),
         len => {
             for i in 1..len {
-                line_nalgebra(&verts[i - 1], &verts[i], c);
+                line_euclid(&verts[i - 1], &verts[i], c);
             }
             if closed {
-                line_nalgebra(&verts[0], &verts[len - 1], c);
+                line_euclid(&verts[0], &verts[len - 1], c);
             }
         }
     };
 }
 
 pub fn make_rot_rect_verts(
-    center: &Point2<f64>,
+    center: &Point2D<f64>,
     width: i32,
     height: i32,
     angle: f64,
-) -> [Point2<f64>; 4] {
+) -> [Point2D<f64>; 4] {
     let center_x = center.x;
     let center_y = center.y;
     let width = width.abs() as f64;
@@ -1082,26 +1043,33 @@ pub fn make_rot_rect_verts(
     let sin = angle.sin();
     let cos = angle.cos();
     [
-        Point2::new(
+        Point2D::new(
             left * cos - top * sin + center_x,
             left * sin + top * cos + center_y,
         ),
-        Point2::new(
+        Point2D::new(
             right * cos - top * sin + center_x,
             right * sin + top * cos + center_y,
         ),
-        Point2::new(
+        Point2D::new(
             right * cos - bottom * sin + center_x,
             right * sin + bottom * cos + center_y,
         ),
-        Point2::new(
+        Point2D::new(
             left * cos - bottom * sin + center_x,
             left * sin + bottom * cos + center_y,
         ),
     ]
 }
 
-pub fn rot_rect(center: &Point2<f64>, width: i32, height: i32, thickness: i32, angle: f64, c: i32) {
+pub fn rot_rect(
+    center: &Point2D<f64>,
+    width: i32,
+    height: i32,
+    thickness: i32,
+    angle: f64,
+    c: i32,
+) {
     let outer = make_rot_rect_verts(center, width, height, angle);
     let inner = make_rot_rect_verts(center, width - thickness, height - thickness, angle);
     // tri_fill(
@@ -1113,37 +1081,46 @@ pub fn rot_rect(center: &Point2<f64>, width: i32, height: i32, thickness: i32, a
     tri_fill_fan(&[outer[3], outer[0], inner[0], inner[3]], c);
 }
 
-pub fn rot_rect_fill(center: &Point2<f64>, width: i32, height: i32, angle: f64, c: i32) {
+pub fn rot_rect_fill(center: &Point2D<f64>, width: i32, height: i32, angle: f64, c: i32) {
     tri_fill_fan(&make_rot_rect_verts(center, width, height, angle), c);
 }
 
 fn make_fat_points(
-    vector: &Vector2<f64>,
-    point: &Point2<f64>,
+    vector: &Vector2D<f64>,
+    point: &Point2D<f64>,
     half_length: f64,
-) -> (Point2<f64>, Point2<f64>) {
-    let (v0, v1) = (vector[0], vector[1]);
-    (
-        point + (Vector2::new(v1, v0 * -1.0).normalize() * half_length),
-        point + (Vector2::new(v1 * -1.0, v0).normalize() * half_length),
-    )
+) -> (Point2D<f64>, Point2D<f64>) {
+    let (v0, v1) = (vector.x, vector.y);
+    if v0.is_nan() || v1.is_nan() {
+        (point.clone(), point.clone())
+    } else {
+        (
+            *point + (Vector2D::new(v1, v0 * -1.0).normalize() * half_length),
+            *point + (Vector2D::new(v1 * -1.0, v0).normalize() * half_length),
+        )
+    }
 }
 
-pub fn fat_line_strip(verts: &[Point2<f64>], half_width: f64, c: i32) {
+pub fn fat_line_strip(verts: &[Point2D<f64>], half_width: f64, c: i32) {
     match verts.len() {
         0 => {}
-        1 => pset_nalgebra(&verts[0], c),
-        2 => line_nalgebra(&verts[0], &verts[1], c),
+        1 => pset_euclid(&verts[0], c),
+        2 => line_euclid(&verts[0], &verts[1], c),
         len => {
             let mut v = vec![make_fat_points(
-                &(verts[0].coords - verts[1].coords).normalize(),
+                &(verts[0] - verts[1]).normalize(),
                 &verts[0],
                 half_width,
             )];
             for i in 1..(len - 1) {
-                let v0 = (verts[i - 1].coords - verts[i].coords).normalize();
-                let v1 = (verts[i].coords - verts[i + 1].coords).normalize();
-                let opposite_side = (v0.angle(&v1) / 2.0).tan() * half_width;
+                let v0 = (verts[i - 1] - verts[i]).normalize();
+                let v1 = (verts[i] - verts[i + 1]).normalize();
+                let angle = {
+                    let v0 = v0.clone();
+                    let v1 = v1.clone();
+                    (v0.dot(v1) / (v0.dot(v0) * v1.dot(v1)).sqrt()).acos()
+                };
+                let opposite_side = (angle / 2.0).tan() * half_width;
                 let half_width = (opposite_side.powi(2) + half_width.powi(2))
                     .sqrt()
                     .min(half_width * 2.0);
@@ -1154,7 +1131,7 @@ pub fn fat_line_strip(verts: &[Point2<f64>], half_width: f64, c: i32) {
                 ));
             }
             v.push(make_fat_points(
-                &(verts[len - 2].coords - verts[len - 1].coords),
+                &(verts[len - 2] - verts[len - 1]),
                 &verts[len - 1],
                 half_width,
             ));
